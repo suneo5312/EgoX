@@ -19,6 +19,11 @@ CORS(app)
 
 
 
+@app.route('/', methods=['GET'])
+def root():
+    return jsonify({"status": "ok", "service": "EgoX"}), 200
+
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "ok"}), 200

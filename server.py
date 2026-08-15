@@ -2,11 +2,11 @@ import os
 import threading
 
 from app import app
-from DiscordBot import run_bot
 
 
 def start_discord_bot():
     try:
+        from DiscordBot import run_bot
         token = os.environ.get("FF_BOT_TOKEN")
         cfg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Configuration", "DiscordConfig.json")
         if not token and not os.path.exists(cfg):
