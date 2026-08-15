@@ -1,0 +1,6 @@
+**/*.bak
+*.pyc
+__pycache__/
+Configuration/DiscordConfig.json
+LevelUpBot/token.json
+LevelUpBot/cache.pkl

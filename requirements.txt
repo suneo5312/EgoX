@@ -1,0 +1,7 @@
+Flask
+Flask-Cors
+protobuf==7.35.1
+pycryptodome==3.20.0
+requests
+discord.py==2.4.0
+gunicorn

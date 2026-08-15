@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package SendLikes;
+
+message like {
+    int64 uid = 1;
+    string region = 2;
+}
