@@ -2317,8 +2317,11 @@ async def GeNeRaTeAccEss(uid , password):
         "client_secret": "2ee44819e9b4598845141067b281621874d0d5d7af9d8f7e00c1e54715b7d1e3",
         "client_id": "100067"}
     async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=Hr, data=data) as response:
-            if response.status != 200: return "Failed to get access token"
+        async with session.post(url, headers=headers, data=data) as response:
+            if response.status != 200:
+                body = (await response.text())[:120]
+                print(f"❌ Grant failed ({response.status}): {body}")
+                return (None, None)
             data = await response.json()
             open_id = data.get("open_id")
             access_token = data.get("access_token")
@@ -4278,6 +4281,64 @@ async def TcPChaT(ip, port, AutHToKen, key, iv, LoGinDaTaUncRypTinG, ready_event
             whisper_writer = None
         await asyncio.sleep(reconnect_delay)
 
+async def level_monitor(bot_uid, token, server_url):
+    import aiohttp
+    level = None
+    last = {}
+    while True:
+        try:
+            if os.path.dirname(os.path.dirname(os.path.abspath(__file__))) not in sys.path:
+                sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            import Proto.compiled.PlayerPersonalShow_pb2
+            from Utilities.until import encode_protobuf, decode_protobuf
+            encrypted = encode_protobuf({
+                "accountId": int(bot_uid),
+                "callSignSrc": 7,
+                "needGalleryInfo": False,
+                "needBlacklist": False,
+                "needSparkInfo": False,
+            }, Proto.compiled.PlayerPersonalShow_pb2.request())
+            headers = {
+                "User-Agent": "UnityPlayer/2022.3.47f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)",
+                "Accept-Encoding": "deflate, gzip",
+                "Authorization": f"Bearer {token}",
+                "X-GA": "v1 1",
+                "ReleaseVersion": "OB54",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "X-Unity-Version": "2022.3.47f1",
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f"{server_url}/GetPlayerPersonalShow", data=encrypted, headers=headers, timeout=20) as resp:
+                    if resp.status != 200:
+                        await asyncio.sleep(60)
+                        continue
+                    msg = decode_protobuf(await resp.read(), Proto.compiled.PlayerPersonalShow_pb2.response)
+                    info = msg.get("basicinfo", {})
+                    lv = info.get("level")
+                    if lv is None:
+                        await asyncio.sleep(60)
+                        continue
+                    if level is None:
+                        level = lv
+                        print(f"📊 Current level: {lv}")
+                    elif lv != level:
+                        print(f"🎉 LIVE LEVEL UP! Level {level} → {lv} 🎉")
+                        level = lv
+                    nick = info.get("nickname", "")
+                    if nick and last.get("nick") != nick:
+                        last["nick"] = nick
+                        print(f"👤 Account name: {nick}")
+                    exp = info.get("exp")
+                    if exp is not None and last.get("exp") != exp:
+                        last["exp"] = exp
+                        print(f"📈 EXP: {exp}")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"⚠️ Level monitor error: {str(e)[:80]}")
+        await asyncio.sleep(45)
+
+
 async def MaiiiinE():
     import json
     import time
@@ -4378,6 +4439,7 @@ async def MaiiiinE():
 
     task1 = asyncio.create_task(TcPChaT(ChaTiP, ChaTporT, AutHToKen, key, iv, LoGinDaTaUncRypTinG, ready_event, region))
     task2 = asyncio.create_task(TcPOnLine(OnLineiP, OnLineporT, key, iv, AutHToKen))
+    task3 = asyncio.create_task(level_monitor(int(TarGeT), ToKen, UrL))
 
     # ---------- 加载动画（模仿第二个版本）----------
     os.system('clear')
@@ -4472,7 +4534,8 @@ async def StarTinG():
         except asyncio.TimeoutError:
             pass
         except Exception as e:
-            pass
+            print(f"⚠️ Login attempt failed: {type(e).__name__}: {str(e)[:100]} — retrying in 60s")
+        await asyncio.sleep(60)
 
 if __name__ == '__main__':
     asyncio.run(StarTinG())
