@@ -6,65 +6,133 @@
 <title>EgoX — Free Fire Toolkit</title>
 <style>
   :root {
-    --bg: #0d1117; --card: #161b22; --card2: #1c232e; --line: #2d333b;
-    --txt: #e6edf3; --dim: #8b949e; --acc: #ff6a00; --acc2: #ffa500;
-    --ok: #3fb950; --err: #f85149;
+    --bg: #070b12; --card: rgba(22, 27, 34, .85); --card2: #161d27; --line: #232b36;
+    --txt: #e8eef5; --dim: #8b98a8; --acc: #ff6a00; --acc2: #ffa63d; --acc3: #ff3d3d;
+    --ok: #3fd66f; --err: #ff5252; --glow: rgba(255, 106, 0, .35);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--txt); font-family: "Segoe UI", system-ui, sans-serif; min-height: 100vh; }
-  header { display: flex; align-items: center; gap: 14px; padding: 18px 24px; border-bottom: 1px solid var(--line); background: linear-gradient(90deg, #1a1005, #161b22); }
-  .logo { font-size: 26px; font-weight: 900; letter-spacing: 2px; color: var(--acc); text-shadow: 0 0 18px rgba(255,106,0,.5); }
-  .logo span { color: var(--txt); }
-  header small { color: var(--dim); margin-top: 4px; display: block; font-weight: 400; }
-  main { max-width: 1080px; margin: 0 auto; padding: 22px 16px 60px; display: grid; gap: 20px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
-  .card h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--acc2); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
-  .card h2::before { content: ""; width: 4px; height: 18px; background: var(--acc); border-radius: 2px; }
-  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
-  .field { display: flex; flex-direction: column; gap: 5px; }
-  .field label { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
-  input, select, textarea, button { background: var(--card2); border: 1px solid var(--line); color: var(--txt); border-radius: 8px; padding: 9px 12px; font-size: 14px; outline: none; }
-  input:focus, select:focus, textarea:focus { border-color: var(--acc); }
-  textarea { resize: vertical; min-height: 90px; font-family: ui-monospace, monospace; font-size: 12px; }
-  button { cursor: pointer; font-weight: 600; border: none; background: linear-gradient(135deg, var(--acc), var(--acc2)); color: #1a1005; padding: 10px 20px; transition: filter .15s; }
-  button:hover { filter: brightness(1.15); }
+  body { background: var(--bg); color: var(--txt); font-family: "Segoe UI", system-ui, -apple-system, sans-serif; min-height: 100vh; overflow-x: hidden; }
+
+  .bgfx { position: fixed; inset: 0; z-index: -1; pointer-events: none; background:
+    radial-gradient(600px 400px at 15% 0%, rgba(255,106,0,.12), transparent 60%),
+    radial-gradient(700px 500px at 90% 15%, rgba(255,166,61,.08), transparent 60%),
+    radial-gradient(900px 700px at 50% 110%, rgba(255,61,61,.07), transparent 60%),
+    var(--bg); }
+  .bgfx::before { content:""; position:absolute; inset:0; background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size: 44px 44px; animation: gridmove 24s linear infinite; }
+  @keyframes gridmove { from { background-position: 0 0; } to { background-position: 44px 44px; } }
+
+  header { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 16px; padding: 16px 26px;
+    background: rgba(10, 14, 20, .8); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+  .logo { font-size: 28px; font-weight: 900; letter-spacing: 3px; background: linear-gradient(135deg, var(--acc), var(--acc2), var(--acc3));
+    -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 14px var(--glow));
+    animation: logoglow 3s ease-in-out infinite; }
+  @keyframes logoglow { 0%,100% { filter: drop-shadow(0 0 10px var(--glow)); } 50% { filter: drop-shadow(0 0 26px var(--glow)); } }
+  header .sub { color: var(--dim); font-size: 12.5px; letter-spacing: .4px; }
+  .pulse-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); margin-left: auto; box-shadow: 0 0 0 0 rgba(63,214,111,.6); animation: pulse 2s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(63,214,111,.6);} 70% { box-shadow: 0 0 0 9px rgba(63,214,111,0);} 100% { box-shadow: 0 0 0 0 rgba(63,214,111,0);} }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 26px 16px 70px; display: grid; gap: 22px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px;
+    backdrop-filter: blur(8px); position: relative; overflow: hidden;
+    transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+    animation: rise .5s ease both; }
+  .card:nth-child(1) { animation-delay: .05s; } .card:nth-child(2) { animation-delay: .15s; } .card:nth-child(3) { animation-delay: .25s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+  .card:hover { transform: translateY(-3px); border-color: rgba(255,106,0,.45); box-shadow: 0 12px 40px rgba(0,0,0,.45), 0 0 0 1px rgba(255,106,0,.12), 0 0 30px rgba(255,106,0,.06); }
+  .card::after { content: ""; position: absolute; top: 0; left: -80%; width: 60%; height: 100%;
+    background: linear-gradient(105deg, transparent, rgba(255,255,255,.04), transparent); transform: skewX(-20deg);
+    transition: left .7s ease; pointer-events: none; }
+  .card:hover::after { left: 130%; }
+  .card h2 { font-size: 13.5px; text-transform: uppercase; letter-spacing: 2px; color: var(--acc2); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .card h2::before { content: ""; width: 4px; height: 18px; background: linear-gradient(var(--acc), var(--acc3)); border-radius: 2px; box-shadow: 0 0 10px var(--glow); animation: barslide 2.4s ease-in-out infinite; }
+  @keyframes barslide { 0%,100% { transform: scaleY(1);} 50% { transform: scaleY(.55);} }
+
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 10.5px; color: var(--dim); text-transform: uppercase; letter-spacing: 1.4px; }
+  input, select, textarea, button { background: var(--card2); border: 1px solid var(--line); color: var(--txt); border-radius: 10px; padding: 10px 13px; font-size: 14px; outline: none; transition: border-color .2s, box-shadow .2s, transform .15s; }
+  input:focus, select:focus, textarea:focus { border-color: var(--acc); box-shadow: 0 0 0 3px rgba(255,106,0,.15); }
+  textarea { resize: vertical; min-height: 90px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; }
+  button { cursor: pointer; font-weight: 700; border: none; background: linear-gradient(135deg, var(--acc), var(--acc2)); color: #160a02; padding: 11px 22px; position: relative; overflow: hidden; }
+  button::before { content: ""; position: absolute; top: 0; left: -75%; width: 50%; height: 100%;
+    background: linear-gradient(105deg, transparent, rgba(255,255,255,.45), transparent); transform: skewX(-20deg);
+    animation: shine 2.8s ease-in-out infinite; }
+  @keyframes shine { 0% { left: -75%; } 55% { left: 135%; } 100% { left: 135%; } }
+  button:hover { filter: brightness(1.18); transform: translateY(-1px); }
+  button:active { transform: scale(.97); }
   button.ghost { background: var(--card2); color: var(--txt); border: 1px solid var(--line); }
-  button.danger { background: #3d1a1a; color: var(--err); border: 1px solid #5c2a2a; }
-  .msg { margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-size: 13px; display: none; white-space: pre-wrap; word-break: break-word; }
+  button.ghost::before { display: none; }
+  button.danger { background: rgba(255,60,60,.12); color: var(--err); border: 1px solid rgba(255,60,60,.35); }
+  button.danger::before { display: none; }
+  button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+  .msg { margin-top: 14px; padding: 12px 16px; border-radius: 10px; font-size: 13px; display: none; white-space: pre-wrap; word-break: break-word; animation: fadein .3s ease; }
   .msg.show { display: block; }
-  .msg.ok { background: #12271a; border: 1px solid #1d4a2a; color: var(--ok); }
-  .msg.err { background: #2b1212; border: 1px solid #5c2a2a; color: var(--err); }
-  .msg.info { background: #101c2b; border: 1px solid #1e3a5c; color: #79c0ff; }
-  .player-head { display: flex; align-items: center; gap: 16px; padding: 8px 4px 16px; border-bottom: 1px solid var(--line); }
-  .avatar { width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, var(--acc), var(--acc2)); display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; color: #1a1005; }
-  .player-head h3 { font-size: 22px; }
-  .player-head .sub { color: var(--dim); font-size: 13px; margin-top: 4px; }
-  .badges { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-  .badge { background: var(--card2); border: 1px solid var(--line); border-radius: 20px; padding: 4px 12px; font-size: 12px; color: var(--dim); }
-  .badge b { color: var(--acc2); }
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
-  .stat { background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
-  .stat .v { font-size: 20px; font-weight: 700; }
-  .stat .k { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .8px; margin-top: 3px; }
-  .mode-tabs { display: flex; gap: 8px; margin: 14px 0 4px; flex-wrap: wrap; }
-  .mode-tabs .tab { cursor: pointer; padding: 6px 16px; border-radius: 8px; background: var(--card2); border: 1px solid var(--line); font-size: 13px; color: var(--dim); }
-  .mode-tabs .tab.active { background: linear-gradient(135deg, var(--acc), var(--acc2)); color: #1a1005; font-weight: 700; }
+  .msg.ok { background: rgba(63,214,111,.08); border: 1px solid rgba(63,214,111,.35); color: var(--ok); }
+  .msg.err { background: rgba(255,82,82,.08); border: 1px solid rgba(255,82,82,.35); color: var(--err); }
+  .msg.info { background: rgba(121,192,255,.07); border: 1px solid rgba(121,192,255,.3); color: #79c0ff; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: none; } }
+
+  .player-head { display: flex; align-items: center; gap: 18px; padding: 10px 4px 18px; border-bottom: 1px solid var(--line); }
+  .avatar { width: 64px; height: 64px; border-radius: 18px; background: linear-gradient(135deg, var(--acc), var(--acc2), var(--acc3)); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: #160a02;
+    box-shadow: 0 0 0 3px rgba(255,106,0,.25), 0 0 24px var(--glow); animation: avspin 6s linear infinite; }
+  @keyframes avspin { 0%,100% { border-radius: 18px; } 50% { border-radius: 50%; } }
+  .player-head h3 { font-size: 23px; font-weight: 800; letter-spacing: .3px; }
+  .player-head .sub { color: var(--dim); font-size: 13px; margin-top: 5px; }
+  .badges { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .badge { background: var(--card2); border: 1px solid var(--line); border-radius: 22px; padding: 5px 14px; font-size: 12px; color: var(--dim); transition: border-color .2s, box-shadow .2s, transform .2s; cursor: default; }
+  .badge:hover { border-color: var(--acc); box-shadow: 0 0 12px rgba(255,106,0,.2); transform: translateY(-2px); }
+  .badge b { color: var(--acc2); font-weight: 800; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 11px; margin-top: 16px; }
+  .stat { background: var(--card2); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; cursor: pointer; position: relative;
+    transition: transform .2s, border-color .2s, box-shadow .2s; }
+  .stat:hover { transform: translateY(-3px) scale(1.02); border-color: rgba(255,106,0,.5); box-shadow: 0 6px 20px rgba(0,0,0,.4), 0 0 14px rgba(255,106,0,.12); }
+  .stat .v { font-size: 20px; font-weight: 800; background: linear-gradient(135deg, var(--txt), #9fb2c5); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .stat .k { font-size: 10.5px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+  .stat:hover .v { background: linear-gradient(135deg, var(--acc2), var(--acc)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .stat .exact { position: absolute; top: -9px; right: 8px; font-size: 10px; color: var(--acc2); opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .stat:hover .exact { opacity: 1; }
+
+  .mode-tabs { display: flex; gap: 8px; margin: 16px 0 6px; flex-wrap: wrap; }
+  .mode-tabs .tab { cursor: pointer; padding: 7px 18px; border-radius: 10px; background: var(--card2); border: 1px solid var(--line); font-size: 13px; color: var(--dim); transition: all .2s; font-weight: 600; }
+  .mode-tabs .tab:hover { color: var(--txt); border-color: rgba(255,106,0,.4); }
+  .mode-tabs .tab.active { background: linear-gradient(135deg, var(--acc), var(--acc2)); color: #160a02; font-weight: 800; box-shadow: 0 0 16px rgba(255,106,0,.3); }
   .mode-panel { display: none; }
-  .mode-panel.active { display: block; }
+  .mode-panel.active { display: block; animation: fadein .35s ease; }
+
   table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
-  th { text-align: left; color: var(--dim); text-transform: uppercase; font-size: 11px; letter-spacing: 1px; padding: 8px; border-bottom: 1px solid var(--line); }
-  td { padding: 9px 8px; border-bottom: 1px solid var(--line); }
-  tr:hover td { background: #1a2029; }
-  .mono { font-family: ui-monospace, monospace; }
+  th { text-align: left; color: var(--dim); text-transform: uppercase; font-size: 10.5px; letter-spacing: 1.2px; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 10px 8px; border-bottom: 1px solid var(--line); transition: background .15s; }
+  tbody tr { animation: rowin .3s ease both; }
+  @keyframes rowin { from { opacity: 0; transform: translateX(-8px);} to { opacity: 1; transform: none; } }
+  tbody tr:hover td { background: rgba(255,106,0,.05); }
+  .mono { font-family: ui-monospace, SFMono-Regular, monospace; }
   .empty { color: var(--dim); font-size: 13px; padding: 16px 4px; }
-  .footer-note { color: var(--dim); font-size: 12px; text-align: center; padding: 20px 0 8px; }
+
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.25); border-top-color: var(--acc2); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .footer-note { color: var(--dim); font-size: 12px; text-align: center; padding: 22px 0 6px; }
+  .footer-note b { color: var(--acc2); }
   .pw { cursor: pointer; }
+
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: #26303c; border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--acc); }
+  @media (max-width: 640px) { header .sub { display: none; } .stats-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); } }
 </style>
 </head>
 <body>
+<div class="bgfx"></div>
 <header>
-  <div class="logo">EGO<span>X</span></div>
-  <small>Free Fire Toolkit — player lookup · like booster · guest vault</small>
+  <div class="logo">EGO<span style="-webkit-text-fill-color: var(--txt); background: none;">X</span></div>
+  <div class="sub">Free Fire Toolkit — player lookup · like booster · guest vault</div>
+  <div class="pulse-dot" title="Service online"></div>
 </header>
 <main>
   <div class="card">
@@ -115,22 +183,22 @@
     </div>
     <div id="g_list"></div>
 
-    <h2 style="margin-top:18px">Add Guests</h2>
+    <h2 style="margin-top:20px">Add Guests</h2>
     <div class="row">
       <div class="field"><label>Guest UID</label><input id="g_uid" placeholder="e.g. 6603148404"></div>
       <div class="field"><label>Password (sha256)</label><input id="g_pw" class="mono" placeholder="e.g. 86BAC9..."></div>
       <button id="btn_add_manual">Add Guest</button>
     </div>
-    <div class="field" style="margin-top:12px">
+    <div class="field" style="margin-top:14px">
       <label>Or paste guest JSON (auto-extract)</label>
-      <textarea id="g_json" placeholder='{"uid":"6603148404","password":"86BAC99A..."}  or a list / whole bank JSON'></textarea>
+      <textarea id="g_json" placeholder='{"uid":"6603148404","password":"86BAC99A..."}  — or a list / whole bank JSON'></textarea>
     </div>
     <div class="row" style="margin-top:10px">
       <button id="btn_add_json">Auto-Extract &amp; Add</button>
     </div>
     <div class="msg" id="g_msg"></div>
   </div>
-  <div class="footer-note">EgoX — one tool, one page. Guests give 1 like per target (max 100/target/day).</div>
+  <div class="footer-note"><b>EgoX</b> — one tool, one page. Guests give 1 like per target (max 100/target/day). Hover any number for the exact value, click to pin it.</div>
 </main>
 <script>
 const $ = id => document.getElementById(id);
@@ -157,11 +225,70 @@ const STAT_LABELS = {
   one_game_most_damage: 'Most DMG', one_game_most_kills: 'Most Kills',
   rating_enabled_games: 'RP Games', headshot_count: 'HS Count', road_kills: 'Road Kills'
 };
-function fmt(v) {
-  if (typeof v === 'number') return v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : v >= 10000 ? (v / 1000).toFixed(1) + 'K' : v.toLocaleString();
-  return v === null || v === undefined ? '—' : String(v);
+
+const abbreviate = (n, d = 1) => {
+  if (!n && n !== 0) return '—';
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return (n / 1e9).toFixed(d).replace(/\.0$/, '') + 'B';
+  if (abs >= 1e6) return (n / 1e6).toFixed(d).replace(/\.0$/, '') + 'M';
+  if (abs >= 1e4) return (n / 1e3).toFixed(d).replace(/\.0$/, '') + 'K';
+  return n.toLocaleString();
+};
+const exactNum = (n) => (n === null || n === undefined) ? '—' : Number(n).toLocaleString();
+const fmtDur = (v) => { if (!v) return '—'; const s = Number(v); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m`; };
+
+function animateCount(el, target, formatter, dur = 900) {
+  const start = performance.now();
+  function tick(now) {
+    const p = Math.min((now - start) / dur, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = formatter(eased * target);
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
 }
-function fmtDur(v) { if (!v) return '—'; const s = Number(v); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m`; }
+
+function setStat(el, value, isPct, isDur) {
+  const target = value === null || value === undefined ? 0 : value;
+  const fmt = (v) => isPct ? v.toFixed(1) + '%' : isDur ? fmtDur(v) : abbreviate(v);
+  const exact = isPct ? Number(value || 0).toFixed(2) + '%' : isDur ? fmtDur(value) : exactNum(value);
+  el.title = `Exact: ${exact}`;
+  const sub = el.querySelector('.exact');
+  if (sub) sub.textContent = exact;
+  if (el.classList.contains('v')) {
+    el.dataset.exact = exact;
+    animateCount(el, target, fmt);
+  } else {
+    animateCount(el, target, fmt);
+  }
+}
+
+function statEl(label, value, isPct = false, isDur = false) {
+  const disp = isPct ? (value || 0).toFixed(1) + '%' : isDur ? fmtDur(value) : abbreviate(value);
+  const exact = isPct ? Number(value || 0).toFixed(2) + '%' : isDur ? fmtDur(value) : exactNum(value);
+  return `<div class="stat" data-exact="${exact}" title="Exact: ${exact} — click to pin">
+    <span class="exact">${exact}</span>
+    <div class="v">${disp}</div>
+    <div class="k">${label}</div>
+  </div>`;
+}
+
+document.addEventListener('click', e => {
+  const stat = e.target.closest('.stat');
+  if (!stat) return;
+  const v = stat.querySelector('.v');
+  const exact = stat.dataset.exact;
+  if (!exact || stat.classList.contains('pinned')) {
+    stat.classList.remove('pinned');
+    v.textContent = stat.dataset.orig;
+    stat.querySelector('.exact').style.opacity = '';
+    return;
+  }
+  stat.classList.add('pinned');
+  stat.dataset.orig = v.textContent;
+  v.textContent = exact;
+  stat.querySelector('.exact').style.opacity = '0';
+});
 
 function statCard(obj, label) {
   const d = (obj && obj.detailedstats) || {};
@@ -172,29 +299,31 @@ function statCard(obj, label) {
   const kd = deaths ? (kills / deaths) : kills;
   const wr = games ? (wins / games * 100) : 0;
   const rows = [
-    ['Games', games], ['Wins', wins], ['Win Rate', wr.toFixed(1) + '%'],
-    ['Kills', kills], ['Deaths', deaths], ['K/D', kd.toFixed(2)]
+    ['Games Played', games, false, false], ['Wins', wins, false, false],
+    ['Win Rate', wr, true, false], ['Kills', kills, false, false],
+    ['Deaths', deaths, false, false], ['K/D', kd, false, false]
   ];
   for (const k of Object.keys(STAT_LABELS)) {
     const v = d[k];
-    if (v !== undefined && v !== null && v !== 0 && !['deaths'].includes(k)) rows.push([STAT_LABELS[k], v]);
+    if (v !== undefined && v !== null && v !== 0 && !['deaths'].includes(k)) {
+      rows.push([STAT_LABELS[k], v, false, k === 'survival_time']);
+    }
   }
-  const flat = {};
-  rows.forEach(([k, v]) => { flat[k] = v; });
+  const seen = {};
   let html = '<div class="mode-panel active"><div class="stats-grid">';
-  for (const [k, v] of Object.entries(flat)) {
-    const isDur = k === 'Survival Time';
-    html += `<div class="stat"><div class="v">${isDur ? fmtDur(v) : fmt(v)}</div><div class="k">${k}</div></div>`;
-  }
+  rows.forEach(([k, v, isPct, isDur]) => {
+    if (seen[k]) return; seen[k] = 1;
+    html += statEl(k, v, isPct, isDur);
+  });
   html += '</div></div>';
-  return { html, label };
+  return html;
 }
 
 $('btn_load').onclick = async () => {
   const uid = $('p_uid').value.trim(), srv = $('p_server').value, mode = $('p_mode').value, match = $('p_match').value;
   if (!uid) return showMsg($('p_msg'), 'Enter a player UID', 'err');
   hideMsg($('p_msg'));
-  showMsg($('p_msg'), 'Loading player… (auth + fetch can take a few seconds)', 'info');
+  showMsg($('p_msg'), '<span class="spinner"></span>Loading player… (auth + fetch can take a few seconds)', 'info');
   const { status, data } = await api(`/api/player_info?uid=${encodeURIComponent(uid)}&server=${srv}&gamemode=${mode}&matchmode=${match}`);
   hideMsg($('p_msg'));
   if (status !== 200 || !data.success) { showMsg($('p_msg'), (data && data.error) || 'Failed to load player', 'err'); return; }
@@ -203,11 +332,11 @@ $('btn_load').onclick = async () => {
   $('player_result').style.display = 'block';
   $('pl_av').textContent = (bd.nickname || '?').charAt(0).toUpperCase();
   $('pl_name').textContent = bd.nickname || 'Unknown';
-  $('pl_sub').textContent = `UID ${data.uid} · ${data.server} · ${data.gamemode.toUpperCase()}`;
-  $('pl_level').textContent = fmt(bd.level);
-  $('pl_rank').textContent = fmt(bd.rank);
-  $('pl_rp').textContent = fmt(bd.rankingpoints);
-  $('pl_likes').textContent = fmt(bd.liked);
+  $('pl_sub').textContent = `UID ${data.uid} · ${data.server} · ${data.gamemode.toUpperCase()} · ${data.matchmode}`;
+  setStat($('pl_level'), bd.level, false, false);
+  setStat($('pl_rank'), bd.rank, false, false);
+  setStat($('pl_rp'), bd.rankingpoints, false, false);
+  setStat($('pl_likes'), bd.liked, false, false);
   $('pl_clan').textContent = bd.clanname || '—';
   const st = data.stats || {};
   let panels = '';
@@ -217,11 +346,11 @@ $('btn_load').onclick = async () => {
     parts.forEach(([label, obj], i) => {
       if (!obj) return;
       tabs += `<div class="tab ${i === 0 ? 'active' : ''}" data-p="p${i}">${label}</div>`;
-      content += `<div class="mode-panel ${i === 0 ? 'active' : ''}" id="p${i}">${statCard(obj, label).html}</div>`;
+      content += `<div class="mode-panel ${i === 0 ? 'active' : ''}" id="p${i}">${statCard(obj, label)}</div>`;
     });
     panels = tabs ? `<div class="mode-tabs">${tabs}</div>${content}` : '<div class="empty">No BR stats found for this player.</div>';
   } else {
-    panels = st.csstats ? `<div class="mode-panel active">${statCard(st.csstats, 'CS').html}</div>` : '<div class="empty">No CS stats found for this player.</div>';
+    panels = st.csstats ? `<div class="mode-panel active">${statCard(st.csstats, 'CS')}</div>` : '<div class="empty">No CS stats found for this player.</div>';
   }
   $('pl_stats').innerHTML = panels;
   document.querySelectorAll('.mode-tabs .tab').forEach(t => t.onclick = () => {
@@ -236,7 +365,7 @@ $('btn_like').onclick = async () => {
   const uid = $('l_uid').value.trim(), srv = $('l_server').value, cnt = parseInt($('l_count').value) || 1;
   if (!uid) return showMsg($('l_msg'), 'Enter a target UID', 'err');
   hideMsg($('l_msg'));
-  showMsg($('l_msg'), 'Sending likes via guest accounts…', 'info');
+  showMsg($('l_msg'), '<span class="spinner"></span>Sending likes via guest accounts…', 'info');
   const { status, data } = await api(`/send_like?uid=${encodeURIComponent(uid)}&server=${srv}&count=${cnt}`);
   if (status === 200 && data.status === 'success') {
     showMsg($('l_msg'),
@@ -252,7 +381,7 @@ function guestRow(g) {
   return `<tr>
     <td class="mono">${g.uid}</td>
     <td class="mono pw" title="Click to reveal" onclick="togglePw(this,'${g.password}')">${shown}</td>
-    <td>${g.likes_sent}</td>
+    <td><b>${g.likes_sent}</b></td>
     <td><button class="danger" onclick="removeGuest('${g.uid}')">Remove</button></td>
   </tr>`;
 }
@@ -293,7 +422,7 @@ $('btn_add_json').onclick = async () => {
   const j = $('g_json').value.trim();
   if (!j) return showMsg($('g_msg'), 'Paste some JSON first', 'err');
   hideMsg($('g_msg'));
-  showMsg($('g_msg'), 'Extracting guest accounts…', 'info');
+  showMsg($('g_msg'), '<span class="spinner"></span>Extracting guest accounts…', 'info');
   const { status, data } = await api('/api/guests/add', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ server: $('g_server').value, json_text: j })
