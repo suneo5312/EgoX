@@ -29,6 +29,11 @@ def load_guest_accounts():
     except json.JSONDecodeError:
         raise Exception("Error parsing GuestAccounts.json")
 
+def save_guest_accounts(bank):
+    path = os.environ.get("GUEST_CONFIG", os.path.join(BASE_DIR, "Configuration", "GuestAccounts.json"))
+    with open(path, 'w') as file:
+        json.dump(bank, file, indent=4)
+
 # Track which guests already liked which target (permanent, 1 like per guest per target)
 def load_usage_history():
     try:

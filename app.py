@@ -1,15 +1,35 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import json
 import os
 import time
 from datetime import datetime, timedelta
-from Utilities.until import load_accounts
+from Utilities.until import load_accounts, load_guest_accounts, load_usage_history, save_usage_history, save_guest_accounts
 from Api.Account import get_garena_token, get_major_login
 from Api.InGame import get_player_personal_show, get_player_stats, search_account_by_keyword, send_like
 
 
 accounts = load_accounts()
+
+
+def normalize_server(name):
+    srv = (name or "IND").upper().strip()
+    if srv in accounts:
+        return srv
+    for k in accounts:
+        if k.startswith(srv):
+            return k
+    return None
+
+
+def bank_key(bank, name):
+    srv = (name or "IND").upper().strip()
+    if srv in bank:
+        return srv
+    for k in bank:
+        if k.startswith(srv):
+            return k
+    return None
 
 
 app = Flask(__name__)
@@ -21,12 +41,152 @@ CORS(app)
 
 @app.route('/', methods=['GET'])
 def root():
-    return jsonify({"status": "ok", "service": "EgoX"}), 200
+    display_servers = sorted({k.rstrip("0123456789") for k in accounts} | {k for k in load_guest_accounts()})
+    return render_template('index.html', servers=display_servers)
 
 
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "ok"}), 200
+
+
+@app.route('/api/player_info', methods=['GET'])
+def api_player_info():
+    try:
+        server = (request.args.get('server') or 'IND').upper()
+        uid = request.args.get('uid')
+        gamemode = (request.args.get('gamemode') or 'br').lower()
+        matchmode = (request.args.get('matchmode') or 'CAREER').upper()
+
+        if not uid or not uid.isdigit():
+            return jsonify({"success": False, "error": "UID parameter is required and must be numeric"}), 400
+        auth_key = normalize_server(server)
+        if not auth_key:
+            return jsonify({"success": False, "error": f"Server '{server}' not found. Available: {sorted(set(k.rstrip('0123456789') for k in accounts))}"}), 400
+        if gamemode not in ['br', 'cs']:
+            return jsonify({"success": False, "error": "gamemode must be 'br' or 'cs'"}), 400
+        if matchmode not in ['CAREER', 'NORMAL', 'RANKED']:
+            return jsonify({"success": False, "error": "matchmode must be CAREER, NORMAL or RANKED"}), 400
+
+        auth_response = get_garena_token(accounts[auth_key]['uid'], accounts[auth_key]['password'])
+        if not auth_response or 'access_token' not in auth_response:
+            return jsonify({"success": False, "error": "Garena authentication failed"}), 401
+        login_response = get_major_login(auth_response["access_token"], auth_response["open_id"])
+        if not login_response or 'token' not in login_response:
+            return jsonify({"success": False, "error": "Major login failed"}), 401
+
+        basicinfo = get_player_personal_show(login_response["serverUrl"], login_response["token"], int(uid))
+        try:
+            stats = get_player_stats(login_response["token"], login_response["serverUrl"], gamemode, int(uid), matchmode)
+        except Exception:
+            stats = None
+
+        return jsonify({
+            "success": True,
+            "server": server,
+            "uid": uid,
+            "gamemode": gamemode,
+            "matchmode": matchmode,
+            "basicinfo": basicinfo or {},
+            "stats": stats or {},
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Internal error: {str(e)}"}), 500
+
+
+@app.route('/api/guests', methods=['GET'])
+def api_guests():
+    try:
+        bank = load_guest_accounts()
+        usage = load_usage_history()
+        out = {}
+        for srv, guests in bank.items():
+            gl = guests if isinstance(guests, list) else [guests]
+            arr = []
+            for g in gl:
+                liked_count = sum(1 for t in usage.values() if str(g.get("uid")) in t.get("used", []))
+                arr.append({"uid": g.get("uid"), "password": g.get("password", ""), "likes_sent": liked_count})
+            out[srv] = arr
+        return jsonify({"success": True, "guests": out}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Failed to load guest bank: {str(e)}"}), 500
+
+
+@app.route('/api/guests/add', methods=['POST'])
+def api_guests_add():
+    try:
+        data = request.get_json(silent=True) or {}
+        server = str(data.get('server') or 'IND').upper()
+        bank = load_guest_accounts()
+        key = bank_key(bank, server)
+        gl = bank.get(key, [])
+        if not isinstance(gl, list):
+            gl = []
+
+        def extract(obj):
+            found = []
+            if isinstance(obj, dict):
+                uid = obj.get('uid') or obj.get('account_id') or obj.get('external_uid')
+                pw = obj.get('password') or obj.get('passwd') or obj.get('password_hash')
+                if uid is not None and pw is not None:
+                    found.append({"uid": str(uid), "password": str(pw)})
+                for v in obj.values():
+                    found.extend(extract(v))
+            elif isinstance(obj, list):
+                for v in obj:
+                    found.extend(extract(v))
+            return found
+
+        entries = []
+        if data.get('uid') and data.get('password'):
+            entries.append({"uid": str(data['uid']).strip(), "password": str(data['password']).strip()})
+        if data.get('json_text'):
+            try:
+                parsed = json.loads(data['json_text'])
+            except Exception as e:
+                return jsonify({"success": False, "error": f"Invalid JSON: {str(e)}"}), 400
+            entries.extend(extract(parsed))
+
+        if not entries:
+            return jsonify({"success": False, "error": "No guest entries found. Provide uid+password or JSON with uid/password fields."}), 400
+
+        existing = {str(g.get('uid')) for g in gl}
+        added = 0
+        for e in entries:
+            if not e['uid'].isdigit() or not e['password']:
+                continue
+            if e['uid'] in existing:
+                continue
+            gl.append(e)
+            existing.add(e['uid'])
+            added += 1
+
+        bank[key] = gl
+        save_guest_accounts(bank)
+        return jsonify({"success": True, "added": added, "server": key or server, "total": len(gl)}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Failed to add guests: {str(e)}"}), 500
+
+
+@app.route('/api/guests/remove', methods=['POST'])
+def api_guests_remove():
+    try:
+        data = request.get_json(silent=True) or {}
+        server = str(data.get('server') or 'IND').upper()
+        uid = str(data.get('uid') or '')
+        bank = load_guest_accounts()
+        key = bank_key(bank, server)
+        gl = bank.get(key)
+        if not isinstance(gl, list):
+            return jsonify({"success": False, "error": f"No guest accounts for server: {server}"}), 404
+        before = len(gl)
+        bank[key] = [g for g in gl if str(g.get('uid')) != uid]
+        if len(bank[key]) == before:
+            return jsonify({"success": False, "error": f"Guest {uid} not found"}), 404
+        save_guest_accounts(bank)
+        return jsonify({"success": True, "removed": uid, "server": key, "total": len(bank[key])}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Failed to remove guest: {str(e)}"}), 500
 
 
 @app.route('/get_search_account_by_keyword', methods=['GET'])
@@ -45,11 +205,12 @@ def get_search_account_by_keyword():
             return json.dumps({"error": "Keyword must be at least 3 characters long"}, indent=2), 400, {'Content-Type': 'application/json; charset=utf-8'}
         
         # Validate server exists in accounts
-        if region not in accounts:
+        auth_key = normalize_server(region)
+        if not auth_key:
             return json.dumps({"error": f"Invalid server: {region}"}, indent=2), 400, {'Content-Type': 'application/json; charset=utf-8'}
         
         # Authenticate with Garena
-        auth_response = get_garena_token(accounts[region]['uid'], accounts[region]['password'])
+        auth_response = get_garena_token(accounts[auth_key]['uid'], accounts[auth_key]['password'])
         if not auth_response or 'access_token' not in auth_response:
             return json.dumps({"error": "Authentication failed"}, indent=2), 401, {'Content-Type': 'application/json; charset=utf-8'}
         
@@ -95,11 +256,12 @@ def get_player_stat():
             }), 400
 
         # Validate server
-        if server not in accounts:
+        auth_key = normalize_server(server)
+        if not auth_key:
             return jsonify({
                 "success": False,
                 "error": "Invalid server",
-                "message": f"Server '{server}' not found. Available servers: {list(accounts.keys())}"
+                "message": f"Server '{server}' not found. Available servers: {sorted(set(k.rstrip('0123456789') for k in accounts))}"
             }), 400
 
         # Validate gamemode
@@ -120,7 +282,7 @@ def get_player_stat():
 
         # Step 1: Get Garena token
         try:
-            garena_token_result = get_garena_token(accounts[server]['uid'], accounts[server]['password'])
+            garena_token_result = get_garena_token(accounts[auth_key]['uid'], accounts[auth_key]['password'])
             
             if not garena_token_result or 'access_token' not in garena_token_result:
                 return jsonify({
@@ -265,12 +427,13 @@ def get_account_info():
             return jsonify(response), 400, {'Content-Type': 'application/json; charset=utf-8'}
         
         # Validate server parameter
-        if server not in accounts:
+        auth_key = normalize_server(server)
+        if not auth_key:
             response = {
                 "status": "error",
                 "error": "Invalid Server",
-                "message": f"Server '{server}' not found. Available servers: {list(accounts.keys())}",
-                "available_servers": list(accounts.keys()),
+                "message": f"Server '{server}' not found. Available servers: {sorted(set(k.rstrip('0123456789') for k in accounts))}",
+                "available_servers": sorted(set(k.rstrip('0123456789') for k in accounts)),
                 "code": "SERVER_NOT_FOUND"
             }
             return jsonify(response), 400, {'Content-Type': 'application/json; charset=utf-8'}
@@ -359,7 +522,7 @@ def get_account_info():
             return jsonify(response), 400, {'Content-Type': 'application/json; charset=utf-8'}
         
         # Check if server account credentials exist
-        if 'uid' not in accounts[server] or 'password' not in accounts[server]:
+        if 'uid' not in accounts[auth_key] or 'password' not in accounts[auth_key]:
             response = {
                 "status": "error",
                 "error": "Server Configuration Error",
@@ -369,7 +532,7 @@ def get_account_info():
             return jsonify(response), 500, {'Content-Type': 'application/json; charset=utf-8'}
         
         # Step 1: Get Garena token
-        garena_token_result = get_garena_token(accounts[server]['uid'], accounts[server]['password'])
+        garena_token_result = get_garena_token(accounts[auth_key]['uid'], accounts[auth_key]['password'])
         if not garena_token_result or 'access_token' not in garena_token_result or 'open_id' not in garena_token_result:
             response = {
                 "status": "error",
@@ -455,10 +618,11 @@ def send_like_endpoint():
         _cfg.DEBUG = False
 
         guest_bank = load_guest_accounts()
-        if server not in guest_bank:
+        key = bank_key(guest_bank, server)
+        if not key:
             return jsonify({"status": "error", "error": f"No guest accounts for server: {server}", "code": "NO_GUESTS"}), 400
 
-        guests = guest_bank[server]
+        guests = guest_bank[key]
         if not isinstance(guests, list):
             guests = [guests]
 

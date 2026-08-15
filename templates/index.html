@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EgoX — Free Fire Toolkit</title>
+<style>
+  :root {
+    --bg: #0d1117; --card: #161b22; --card2: #1c232e; --line: #2d333b;
+    --txt: #e6edf3; --dim: #8b949e; --acc: #ff6a00; --acc2: #ffa500;
+    --ok: #3fb950; --err: #f85149;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--txt); font-family: "Segoe UI", system-ui, sans-serif; min-height: 100vh; }
+  header { display: flex; align-items: center; gap: 14px; padding: 18px 24px; border-bottom: 1px solid var(--line); background: linear-gradient(90deg, #1a1005, #161b22); }
+  .logo { font-size: 26px; font-weight: 900; letter-spacing: 2px; color: var(--acc); text-shadow: 0 0 18px rgba(255,106,0,.5); }
+  .logo span { color: var(--txt); }
+  header small { color: var(--dim); margin-top: 4px; display: block; font-weight: 400; }
+  main { max-width: 1080px; margin: 0 auto; padding: 22px 16px 60px; display: grid; gap: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .card h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--acc2); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .card h2::before { content: ""; width: 4px; height: 18px; background: var(--acc); border-radius: 2px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+  input, select, textarea, button { background: var(--card2); border: 1px solid var(--line); color: var(--txt); border-radius: 8px; padding: 9px 12px; font-size: 14px; outline: none; }
+  input:focus, select:focus, textarea:focus { border-color: var(--acc); }
+  textarea { resize: vertical; min-height: 90px; font-family: ui-monospace, monospace; font-size: 12px; }
+  button { cursor: pointer; font-weight: 600; border: none; background: linear-gradient(135deg, var(--acc), var(--acc2)); color: #1a1005; padding: 10px 20px; transition: filter .15s; }
+  button:hover { filter: brightness(1.15); }
+  button.ghost { background: var(--card2); color: var(--txt); border: 1px solid var(--line); }
+  button.danger { background: #3d1a1a; color: var(--err); border: 1px solid #5c2a2a; }
+  .msg { margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-size: 13px; display: none; white-space: pre-wrap; word-break: break-word; }
+  .msg.show { display: block; }
+  .msg.ok { background: #12271a; border: 1px solid #1d4a2a; color: var(--ok); }
+  .msg.err { background: #2b1212; border: 1px solid #5c2a2a; color: var(--err); }
+  .msg.info { background: #101c2b; border: 1px solid #1e3a5c; color: #79c0ff; }
+  .player-head { display: flex; align-items: center; gap: 16px; padding: 8px 4px 16px; border-bottom: 1px solid var(--line); }
+  .avatar { width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, var(--acc), var(--acc2)); display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; color: #1a1005; }
+  .player-head h3 { font-size: 22px; }
+  .player-head .sub { color: var(--dim); font-size: 13px; margin-top: 4px; }
+  .badges { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .badge { background: var(--card2); border: 1px solid var(--line); border-radius: 20px; padding: 4px 12px; font-size: 12px; color: var(--dim); }
+  .badge b { color: var(--acc2); }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+  .stat { background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .stat .v { font-size: 20px; font-weight: 700; }
+  .stat .k { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .8px; margin-top: 3px; }
+  .mode-tabs { display: flex; gap: 8px; margin: 14px 0 4px; flex-wrap: wrap; }
+  .mode-tabs .tab { cursor: pointer; padding: 6px 16px; border-radius: 8px; background: var(--card2); border: 1px solid var(--line); font-size: 13px; color: var(--dim); }
+  .mode-tabs .tab.active { background: linear-gradient(135deg, var(--acc), var(--acc2)); color: #1a1005; font-weight: 700; }
+  .mode-panel { display: none; }
+  .mode-panel.active { display: block; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  th { text-align: left; color: var(--dim); text-transform: uppercase; font-size: 11px; letter-spacing: 1px; padding: 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 9px 8px; border-bottom: 1px solid var(--line); }
+  tr:hover td { background: #1a2029; }
+  .mono { font-family: ui-monospace, monospace; }
+  .empty { color: var(--dim); font-size: 13px; padding: 16px 4px; }
+  .footer-note { color: var(--dim); font-size: 12px; text-align: center; padding: 20px 0 8px; }
+  .pw { cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">EGO<span>X</span></div>
+  <small>Free Fire Toolkit — player lookup · like booster · guest vault</small>
+</header>
+<main>
+  <div class="card">
+    <h2>Player Lookup</h2>
+    <div class="row">
+      <div class="field"><label>Player UID</label><input id="p_uid" placeholder="e.g. 10502299434"></div>
+      <div class="field"><label>Server</label><select id="p_server">{% for s in servers %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Mode</label><select id="p_mode"><option value="br">BR</option><option value="cs">CS</option></select></div>
+      <div class="field"><label>Match</label><select id="p_match"><option value="CAREER">CAREER</option><option value="NORMAL">NORMAL</option><option value="RANKED">RANKED</option></select></div>
+      <button id="btn_load">Load Player</button>
+    </div>
+    <div class="msg" id="p_msg"></div>
+    <div id="player_result" style="display:none">
+      <div class="player-head">
+        <div class="avatar" id="pl_av">?</div>
+        <div>
+          <h3 id="pl_name">—</h3>
+          <div class="sub" id="pl_sub">—</div>
+          <div class="badges">
+            <span class="badge">Level <b id="pl_level">—</b></span>
+            <span class="badge">BR Rank <b id="pl_rank">—</b></span>
+            <span class="badge">RP <b id="pl_rp">—</b></span>
+            <span class="badge">Likes <b id="pl_likes">—</b></span>
+            <span class="badge">Clan <b id="pl_clan">—</b></span>
+          </div>
+        </div>
+      </div>
+      <div id="pl_stats"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Send Likes</h2>
+    <div class="row">
+      <div class="field"><label>Target UID</label><input id="l_uid" placeholder="e.g. 10502299434"></div>
+      <div class="field"><label>Server</label><select id="l_server">{% for s in servers %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Count (max 100)</label><input id="l_count" type="number" min="1" max="100" value="1"></div>
+      <button id="btn_like">Send Likes</button>
+    </div>
+    <div class="msg" id="l_msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>Guest Accounts Vault</h2>
+    <div class="row">
+      <div class="field"><label>Server</label><select id="g_server">{% for s in servers %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></div>
+      <button id="btn_refresh" class="ghost">Refresh</button>
+    </div>
+    <div id="g_list"></div>
+
+    <h2 style="margin-top:18px">Add Guests</h2>
+    <div class="row">
+      <div class="field"><label>Guest UID</label><input id="g_uid" placeholder="e.g. 6603148404"></div>
+      <div class="field"><label>Password (sha256)</label><input id="g_pw" class="mono" placeholder="e.g. 86BAC9..."></div>
+      <button id="btn_add_manual">Add Guest</button>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label>Or paste guest JSON (auto-extract)</label>
+      <textarea id="g_json" placeholder='{"uid":"6603148404","password":"86BAC99A..."}  or a list / whole bank JSON'></textarea>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="btn_add_json">Auto-Extract &amp; Add</button>
+    </div>
+    <div class="msg" id="g_msg"></div>
+  </div>
+  <div class="footer-note">EgoX — one tool, one page. Guests give 1 like per target (max 100/target/day).</div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+function showMsg(el, text, type) { el.textContent = text; el.className = 'msg show ' + type; }
+function hideMsg(el) { el.className = 'msg'; }
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  let data = null;
+  try { data = await r.json(); } catch (e) {}
+  return { status: r.status, data };
+}
+
+const STAT_LABELS = {
+  gamesplayed: 'Games Played', wins: 'Wins', kills: 'Kills', deaths: 'Deaths',
+  headshots: 'Headshots', head_shot_kills: 'Headshots', damage: 'Damage',
+  top10_times: 'Top 10', top_n_times: 'Top', highest_kills: 'Best Kills',
+  rating_points: 'Rating Points', revives: 'Revives', revivals: 'Revives',
+  assists: 'Assists', mvp_count: 'MVP', distance_travelled: 'Distance',
+  survival_time: 'Survival Time', knock_down: 'Knockdowns', knock_downs: 'Knockdowns',
+  pick_ups: 'Pickups', gold_medal_cnt: 'Gold', silver_medal_cnt: 'Silver',
+  hit_count: 'Hits', double_kills: '2x Kills', triple_kills: '3x Kills',
+  four_kills: '4x Kills', streak_wins: 'Streak Wins', throwing_kills: 'Throw Kills',
+  one_game_most_damage: 'Most DMG', one_game_most_kills: 'Most Kills',
+  rating_enabled_games: 'RP Games', headshot_count: 'HS Count', road_kills: 'Road Kills'
+};
+function fmt(v) {
+  if (typeof v === 'number') return v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : v >= 10000 ? (v / 1000).toFixed(1) + 'K' : v.toLocaleString();
+  return v === null || v === undefined ? '—' : String(v);
+}
+function fmtDur(v) { if (!v) return '—'; const s = Number(v); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m`; }
+
+function statCard(obj, label) {
+  const d = (obj && obj.detailedstats) || {};
+  const games = Number(obj && obj.gamesplayed) || 0;
+  const wins = Number(obj && obj.wins) || 0;
+  const kills = Number(obj && obj.kills) || 0;
+  const deaths = Number(d.deaths) || 0;
+  const kd = deaths ? (kills / deaths) : kills;
+  const wr = games ? (wins / games * 100) : 0;
+  const rows = [
+    ['Games', games], ['Wins', wins], ['Win Rate', wr.toFixed(1) + '%'],
+    ['Kills', kills], ['Deaths', deaths], ['K/D', kd.toFixed(2)]
+  ];
+  for (const k of Object.keys(STAT_LABELS)) {
+    const v = d[k];
+    if (v !== undefined && v !== null && v !== 0 && !['deaths'].includes(k)) rows.push([STAT_LABELS[k], v]);
+  }
+  const flat = {};
+  rows.forEach(([k, v]) => { flat[k] = v; });
+  let html = '<div class="mode-panel active"><div class="stats-grid">';
+  for (const [k, v] of Object.entries(flat)) {
+    const isDur = k === 'Survival Time';
+    html += `<div class="stat"><div class="v">${isDur ? fmtDur(v) : fmt(v)}</div><div class="k">${k}</div></div>`;
+  }
+  html += '</div></div>';
+  return { html, label };
+}
+
+$('btn_load').onclick = async () => {
+  const uid = $('p_uid').value.trim(), srv = $('p_server').value, mode = $('p_mode').value, match = $('p_match').value;
+  if (!uid) return showMsg($('p_msg'), 'Enter a player UID', 'err');
+  hideMsg($('p_msg'));
+  showMsg($('p_msg'), 'Loading player… (auth + fetch can take a few seconds)', 'info');
+  const { status, data } = await api(`/api/player_info?uid=${encodeURIComponent(uid)}&server=${srv}&gamemode=${mode}&matchmode=${match}`);
+  hideMsg($('p_msg'));
+  if (status !== 200 || !data.success) { showMsg($('p_msg'), (data && data.error) || 'Failed to load player', 'err'); return; }
+  const b = data.basicinfo || {};
+  const bd = b.basicinfo || b;
+  $('player_result').style.display = 'block';
+  $('pl_av').textContent = (bd.nickname || '?').charAt(0).toUpperCase();
+  $('pl_name').textContent = bd.nickname || 'Unknown';
+  $('pl_sub').textContent = `UID ${data.uid} · ${data.server} · ${data.gamemode.toUpperCase()}`;
+  $('pl_level').textContent = fmt(bd.level);
+  $('pl_rank').textContent = fmt(bd.rank);
+  $('pl_rp').textContent = fmt(bd.rankingpoints);
+  $('pl_likes').textContent = fmt(bd.liked);
+  $('pl_clan').textContent = bd.clanname || '—';
+  const st = data.stats || {};
+  let panels = '';
+  if (mode === 'br') {
+    const parts = [['Solo', st.solostats], ['Duo', st.duostats], ['Squad', st.quadstats]];
+    let tabs = '', content = '';
+    parts.forEach(([label, obj], i) => {
+      if (!obj) return;
+      tabs += `<div class="tab ${i === 0 ? 'active' : ''}" data-p="p${i}">${label}</div>`;
+      content += `<div class="mode-panel ${i === 0 ? 'active' : ''}" id="p${i}">${statCard(obj, label).html}</div>`;
+    });
+    panels = tabs ? `<div class="mode-tabs">${tabs}</div>${content}` : '<div class="empty">No BR stats found for this player.</div>';
+  } else {
+    panels = st.csstats ? `<div class="mode-panel active">${statCard(st.csstats, 'CS').html}</div>` : '<div class="empty">No CS stats found for this player.</div>';
+  }
+  $('pl_stats').innerHTML = panels;
+  document.querySelectorAll('.mode-tabs .tab').forEach(t => t.onclick = () => {
+    document.querySelectorAll('.mode-tabs .tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.mode-panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    $(t.dataset.p).classList.add('active');
+  });
+};
+
+$('btn_like').onclick = async () => {
+  const uid = $('l_uid').value.trim(), srv = $('l_server').value, cnt = parseInt($('l_count').value) || 1;
+  if (!uid) return showMsg($('l_msg'), 'Enter a target UID', 'err');
+  hideMsg($('l_msg'));
+  showMsg($('l_msg'), 'Sending likes via guest accounts…', 'info');
+  const { status, data } = await api(`/send_like?uid=${encodeURIComponent(uid)}&server=${srv}&count=${cnt}`);
+  if (status === 200 && data.status === 'success') {
+    showMsg($('l_msg'),
+      `✓ Sent ${data.likes_sent}/${data.requested} likes to ${data.uid}\nTotal likes on target: ${data.total_likes_on_target}\nGuests remaining: ${data.guests_remaining}` +
+      (data.warnings && data.warnings.length ? `\nWarnings:\n${data.warnings.join('\n')}` : ''), 'ok');
+  } else {
+    showMsg($('l_msg'), `✗ ${(data && data.error) || 'Failed to send likes'}`, 'err');
+  }
+};
+
+function guestRow(g) {
+  const shown = g.password ? g.password.slice(0, 12) + '…' : '—';
+  return `<tr>
+    <td class="mono">${g.uid}</td>
+    <td class="mono pw" title="Click to reveal" onclick="togglePw(this,'${g.password}')">${shown}</td>
+    <td>${g.likes_sent}</td>
+    <td><button class="danger" onclick="removeGuest('${g.uid}')">Remove</button></td>
+  </tr>`;
+}
+function togglePw(el, full) { el.textContent = el.textContent.includes('…') ? full : full.slice(0, 12) + '…'; }
+
+async function refreshGuests() {
+  const srv = $('g_server').value;
+  const { status, data } = await api('/api/guests');
+  if (status !== 200 || !data.success) { $('g_list').innerHTML = '<div class="empty">Failed to load guests.</div>'; return; }
+  const all = data.guests || {};
+  const list = all[srv];
+  const servers = Object.keys(all);
+  if (servers.length && !servers.includes(srv)) { $('g_server').value = servers[0]; return refreshGuests(); }
+  if (!list || !list.length) {
+    $('g_list').innerHTML = `<div class="empty">No guest accounts in the vault for ${srv}. Add some below — paste the EXTRACT JSON from the app, or enter uid + password manually.</div>`;
+    return;
+  }
+  let total = 0; list.forEach(g => total += g.likes_sent);
+  $('g_list').innerHTML = `<div class="empty" style="padding:10px 4px">${list.length} guests · ${total} likes sent from vault</div>
+  <table><tr><th>Guest UID</th><th>Password</th><th>Likes Sent</th><th></th></tr>${list.map(guestRow).join('')}</table>`;
+}
+$('btn_refresh').onclick = refreshGuests;
+$('g_server').onchange = refreshGuests;
+
+async function addResult(msg, type) { showMsg($('g_msg'), msg, type); await refreshGuests(); }
+$('btn_add_manual').onclick = async () => {
+  const uid = $('g_uid').value.trim(), pw = $('g_pw').value.trim();
+  if (!uid || !pw) return showMsg($('g_msg'), 'Enter both UID and password', 'err');
+  hideMsg($('g_msg'));
+  const { status, data } = await api('/api/guests/add', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ server: $('g_server').value, uid, password: pw })
+  });
+  if (status === 200 && data.success) { addResult(`✓ Added guest ${uid} (${data.added} added, ${data.total} total)`, 'ok'); $('g_uid').value = ''; $('g_pw').value = ''; }
+  else showMsg($('g_msg'), `✗ ${(data && data.error) || 'Failed'}`, 'err');
+};
+$('btn_add_json').onclick = async () => {
+  const j = $('g_json').value.trim();
+  if (!j) return showMsg($('g_msg'), 'Paste some JSON first', 'err');
+  hideMsg($('g_msg'));
+  showMsg($('g_msg'), 'Extracting guest accounts…', 'info');
+  const { status, data } = await api('/api/guests/add', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ server: $('g_server').value, json_text: j })
+  });
+  if (status === 200 && data.success) { addResult(`✓ Extracted & added ${data.added} guest(s) — vault now has ${data.total} for ${data.server}`, 'ok'); $('g_json').value = ''; }
+  else showMsg($('g_msg'), `✗ ${(data && data.error) || 'Failed'}`, 'err');
+};
+async function removeGuest(uid) {
+  if (!confirm(`Remove guest ${uid} from the vault?`)) return;
+  const { status, data } = await api('/api/guests/remove', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ server: $('g_server').value, uid })
+  });
+  if (status === 200 && data.success) addResult(`✓ Removed ${uid}`, 'ok');
+  else showMsg($('g_msg'), `✗ ${(data && data.error) || 'Failed'}`, 'err');
+}
+
+refreshGuests();
+</script>
+</body>
+</html>
