@@ -667,16 +667,6 @@ async def GeTSQDaTa(D):
     squad_code = D["5"]["data"]["31"]["data"]
     return uid, chat_code, squad_code
 
-async def GeTRoomOwner(D):
-    uid = None
-    try:
-        owner = D['5']['data']['1']['data']
-        if isinstance(owner, int) and 100000000 < owner < 99999999999:
-            uid = owner
-    except Exception:
-        pass
-    return uid
-
 async def AutH_Chat(T, uid, code, K, V):
     fields = {
         1: T,

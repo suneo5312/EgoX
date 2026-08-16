@@ -43,11 +43,9 @@ from Pb2 import (
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 ADMIN_UID = "5513136249"
-GUEST_UID = "5940248956"
-GUEST_PASSWORD = "BD1BDC8FC10F017FE0727DC67D3907EA06DA252936441CD401BFDF755833F107"
+GUEST_UID = "6699482175"
+GUEST_PASSWORD = "A6CA1227517C66D058039C1FEB75691ADAE7431B5D84057A9D5817A0EFEF0479"
 region = 'IND'
-BOT_JWT = None
-BOT_SERVER_URL = None
 
 online_writer = None
 whisper_writer = None
@@ -71,7 +69,7 @@ legendry_cycle_running = False
 reject_spam_running = False
 insquad = None
 joining_team = False
-SQUAD_OWNER = None
+join_confirmed = False
 reject_spam_task = None
 lag_running = False
 lag_task = None
@@ -82,7 +80,7 @@ auto_start_teamcode = None
 stop_auto = False
 auto_start_task = None
 start_spam_duration = 18
-wait_after_match = 10
+wait_after_match = 120
 start_spam_delay = 0.1
 spm_inv_task = None
 spm_inv_running = False
@@ -92,21 +90,6 @@ SPAM_REQUESTS = 99
 BADGE_REQUESTS = 5
 exploit_running = False
 exploit_instance = None
-
-MATCH_LOOP_ENABLED = True
-MATCH_CYCLES = 0
-CURRENT_LEVEL = None
-CURRENT_EXP = None
-CURRENT_NICK = None
-BOT_START_TIME = time.time()
-LEVEL_TEAM_CODE = None
-LEVEL_STATE = "idle"
-MATCH_STAY_DURATION = 780
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CTRL_FILE = os.path.join(BASE_DIR, "Configuration", "BotControl.json")
-CTRL_RESULT_FILE = os.path.join(BASE_DIR, "Configuration", "BotControlResult.json")
-STATUS_FILE = os.path.join(BASE_DIR, "Configuration", "BotStatus.json")
 
 evo_emotes = {
     "1": "909000063",
@@ -728,11 +711,11 @@ async def request_join_with_badge(target_uid, badge_value, key, iv, region):
         packet_type = "0515"
     return await GeneRaTePk(packet, packet_type, key, iv)
 
-async def start_auto_packet(key, iv, region, owner_uid=None):
+async def start_auto_packet(key, iv, region):
     fields = {
         1: 9,
         2: {
-            1: owner_uid or SQUAD_OWNER or 12480598706,
+            1: 12480598706,
         },
     }
     if region.lower() == "ind":
@@ -783,35 +766,28 @@ async def join_teamcode_packet(team_code, key, iv, region):
         packet_type = "0515"
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), packet_type, key, iv)
 
-async def ready_squad_packet(owner_uid, bot_uid, key, iv, region):
-    """Msg 5 = squad ready / join-confirm. The server keeps the account
-    'not ready' in the squad lobby until this is sent after joining."""
-    fields = {
-        1: 5,
-        2: {
-            1: int(owner_uid),
-            2: 1,
-            3: int(bot_uid),
-            4: "",
-        },
-    }
-    if region.lower() == "ind":
-        packet_type = '0514'
-    elif region.lower() == "bd":
-        packet_type = "0519"
-    else:
-        packet_type = "0515"
-    return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), packet_type, key, iv)
-
 async def auto_start_loop(team_code, uid, chat_id, chat_type, key, iv, region):
-    global auto_start_running, stop_auto
+    global auto_start_running, stop_auto, join_confirmed
     while not stop_auto:
         try:
             status_msg = f"[B][C][FFA500]🤖 Auto Start Bot\n🎯 Team: {team_code}\n⚡ Joining team..."
             await dl_send_message(chat_type, status_msg, uid, chat_id, key, iv)
-            join_packet = await join_teamcode_packet(team_code, key, iv, region)
-            await SEndPacKeT(whisper_writer, online_writer, 'OnLine', join_packet)
-            await asyncio.sleep(2)
+            join_confirmed = False
+            retries = 0
+            while not join_confirmed and not stop_auto:
+                join_packet = await join_teamcode_packet(team_code, key, iv, region)
+                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', join_packet)
+                retries += 1
+                wait_retry = 0
+                while wait_retry < 8 and not join_confirmed and not stop_auto:
+                    await asyncio.sleep(1)
+                    wait_retry += 1
+                if retries >= 30 and not join_confirmed:
+                    not_joined_msg = f"[B][C][FF0000]⏳ Team {team_code} not accepting joins (match in progress?). Waiting and retrying..."
+                    await dl_send_message(chat_type, not_joined_msg, uid, chat_id, key, iv)
+                    retries = 0
+            if stop_auto:
+                break
             start_msg = f"[B][C][00FF00]✅ Joined team {team_code}\n🎯 Starting match for {start_spam_duration} seconds..."
             await dl_send_message(chat_type, start_msg, uid, chat_id, key, iv)
             start_packet = await start_auto_packet(key, iv, region)
@@ -821,7 +797,7 @@ async def auto_start_loop(team_code, uid, chat_id, chat_type, key, iv, region):
                 await asyncio.sleep(start_spam_delay)
             if stop_auto:
                 break
-            wait_msg = f"[B][C][FFFF00]⏳ Match started! Bot in lobby waiting {wait_after_match} seconds..."
+            wait_msg = f"[B][C][FFFF00]⏳ Match started! Bot staying in match {wait_after_match} seconds..."
             await dl_send_message(chat_type, wait_msg, uid, chat_id, key, iv)
             waited = 0
             while waited < wait_after_match and not stop_auto:
@@ -849,223 +825,6 @@ async def reset_bot_state(key, iv, region):
         return True
     except Exception as e:
         return False
-
-
-async def random_match_loop(key, iv, region, bot_uid):
-    """Level-up loop: joins the configured team (LEVEL_TEAM_CODE), spams the
-    match start, stays in the match until it ends (MATCH_STAY_DURATION), then
-    leaves and repeats. Without a team code the loop idles in waiting_team
-    state (the server ignores solo matchmaking packets entirely)."""
-    global online_writer, whisper_writer, MATCH_LOOP_ENABLED, MATCH_CYCLES, LEVEL_TEAM_CODE, LEVEL_STATE, SQUAD_OWNER
-    while True:
-        try:
-            if not MATCH_LOOP_ENABLED:
-                LEVEL_STATE = "idle"
-                await asyncio.sleep(2)
-                continue
-            if not LEVEL_TEAM_CODE:
-                LEVEL_STATE = "waiting_team"
-                await asyncio.sleep(5)
-                continue
-            if online_writer is None:
-                LEVEL_STATE = "reconnecting"
-                await asyncio.sleep(5)
-                continue
-            LEVEL_STATE = "joining"
-            join_packet = await join_teamcode_packet(LEVEL_TEAM_CODE, key, iv, region)
-            await SEndPacKeT(whisper_writer, online_writer, 'OnLine', join_packet)
-            await asyncio.sleep(3)
-            if online_writer is None:
-                continue
-            LEVEL_STATE = "readying"
-            owner = SQUAD_OWNER or None
-            ready_packet = await ready_squad_packet(owner, bot_uid, key, iv, region) if owner else None
-            start_packet = await start_auto_packet(key, iv, region)
-            for _ in range(40):
-                if online_writer is None:
-                    break
-                if ready_packet is not None:
-                    await SEndPacKeT(whisper_writer, online_writer, 'OnLine', ready_packet)
-                    await asyncio.sleep(0.6)
-                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', start_packet)
-                await asyncio.sleep(0.8)
-            LEVEL_STATE = f"in_match_{MATCH_STAY_DURATION}s"
-            waited = 0
-            while waited < MATCH_STAY_DURATION:
-                await asyncio.sleep(30)
-                waited += 30
-                if not MATCH_LOOP_ENABLED or not LEVEL_TEAM_CODE:
-                    break
-            leave_packet = await leave_squad(key, iv, region)
-            if online_writer is not None:
-                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', leave_packet)
-            await asyncio.sleep(5)
-            MATCH_CYCLES += 1
-            LEVEL_STATE = f"cycle_{MATCH_CYCLES}_done"
-            print(f"🎮 Level-up loop: {MATCH_CYCLES} cycles (team {LEVEL_TEAM_CODE}, level {CURRENT_LEVEL}, exp {CURRENT_EXP})")
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            print(f"⚠️ Level-up loop error: {str(e)[:80]}")
-            await asyncio.sleep(10)
-
-
-def _write_json(path, data):
-    try:
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2)
-    except Exception:
-        pass
-
-
-def _read_json(path):
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-
-async def dashboard_control_loop(key, iv, region, bot_uid):
-    """Polls Configuration/BotControl.json for dashboard commands, executes them
-    with the bot's own helpers, writes results to BotControlResult.json and
-    heartbeats status into BotStatus.json."""
-    global MATCH_LOOP_ENABLED, MATCH_CYCLES, CURRENT_LEVEL, CURRENT_EXP, CURRENT_NICK, LEVEL_TEAM_CODE, LEVEL_STATE, MATCH_STAY_DURATION, SQUAD_OWNER
-    while True:
-        try:
-            cmd = _read_json(CTRL_FILE)
-            if cmd and cmd.get("pending"):
-                cmd["pending"] = False
-                _write_json(CTRL_FILE, cmd)
-                action = cmd.get("action") or ""
-                params = cmd.get("params") or {}
-                cid = cmd.get("id", "cmd")
-                res = {"id": cid, "action": action, "status": "done", "result": "", "at": time.time()}
-                try:
-                    if action == "join_room":
-                        room_id = str(params.get("room_id") or "")
-                        password = str(params.get("password") or "")
-                        if not room_id:
-                            raise ValueError("room_id required")
-                        await reset_bot_state(key, iv, region)
-                        await asyncio.sleep(1)
-                        pkt = await RoomJoin(room_id, password, key, iv)
-                        if not pkt:
-                            raise RuntimeError("failed to build room join packet")
-                        await SEndPacKeT(whisper_writer, online_writer, 'OnLine', pkt)
-                        res["result"] = f"Joined room {room_id}" + (f" (pass: {password})" if password else "")
-                    elif action == "leave_room":
-                        pkt = await XRLeaveRoom(int(bot_uid), key, iv)
-                        if not pkt:
-                            raise RuntimeError("failed to build leave packet")
-                        await SEndPacKeT(whisper_writer, online_writer, 'OnLine', pkt)
-                        res["result"] = "Left room"
-                    elif action == "join_team":
-                        code = str(params.get("team_code") or "")
-                        if not code:
-                            raise ValueError("team_code required")
-                        await reset_bot_state(key, iv, region)
-                        await asyncio.sleep(1)
-                        pkt = await join_teamcode_packet(code, key, iv, region)
-                        if not pkt:
-                            raise RuntimeError("failed to build team join packet")
-                        await SEndPacKeT(whisper_writer, online_writer, 'OnLine', pkt)
-                        res["result"] = f"Joined team {code}"
-                    elif action == "press_ready":
-                        if online_writer is None:
-                            raise RuntimeError("not online")
-                        owner = SQUAD_OWNER or None
-                        if owner is None:
-                            raise RuntimeError("squad owner unknown")
-                        rp = await ready_squad_packet(owner, int(bot_uid), key, iv, region)
-                        await SEndPacKeT(whisper_writer, online_writer, 'OnLine', rp)
-                        res["result"] = f"Ready packet sent (owner {owner})"
-                    elif action == "join_guild":
-                        gid = str(params.get("guild_id") or "")
-                        if not gid:
-                            raise ValueError("guild_id required")
-                        res["result"] = join_guild(gid)
-                    elif action == "leave_guild":
-                        gid = str(params.get("guild_id") or "")
-                        if not gid:
-                            raise ValueError("guild_id required")
-                        res["result"] = leave_guild(gid)
-                    elif action == "send_like":
-                        target = str(params.get("target_uid") or "")
-                        if not target:
-                            raise ValueError("target_uid required")
-                        res["result"] = send_like(int(target))
-                    elif action == "match_loop":
-                        MATCH_LOOP_ENABLED = bool(params.get("enabled"))
-                        res["result"] = f"Match loop {'ON' if MATCH_LOOP_ENABLED else 'OFF'}"
-                    elif action == "set_team_code":
-                        code = str(params.get("team_code") or "").strip()
-                        if not code:
-                            raise ValueError("team_code required")
-                        LEVEL_TEAM_CODE = code
-                        res["result"] = f"Level-up team code set: {code} (loop will join + start + stay {MATCH_STAY_DURATION}s)"
-                    elif action == "set_squad_owner":
-                        owner = str(params.get("owner_uid") or "").strip()
-                        if not owner or not owner.isdigit():
-                            raise ValueError("owner_uid required (the UID hosting the room)")
-                        SQUAD_OWNER = int(owner)
-                        res["result"] = f"Squad owner set: {owner} (ready packet will reference this UID)"
-                    elif action == "clear_team_code":
-                        LEVEL_TEAM_CODE = None
-                        res["result"] = "Level-up team code cleared (loop now waiting for team)"
-                    elif action == "set_match_duration":
-                        secs = int(params.get("seconds") or 0)
-                        if secs < 60 or secs > 3600:
-                            raise ValueError("seconds must be 60-3600")
-                        MATCH_STAY_DURATION = secs
-                        res["result"] = f"In-match stay duration set to {secs}s"
-                    elif action == "start_match_now":
-                        pkt = await start_auto_packet(key, iv, region)
-                        if not pkt:
-                            raise RuntimeError("failed to build start packet")
-                        await SEndPacKeT(whisper_writer, online_writer, 'OnLine', pkt)
-                        res["result"] = "Match start requested"
-                    elif action == "stop_bot":
-                        res["result"] = "Bot stopping (dashboard request)"
-                        _write_json(CTRL_RESULT_FILE, res)
-                        _write_json(STATUS_FILE, {
-                            "running": False, "stopped_by_dashboard": True, "at": time.time()
-                        })
-                        os._exit(0)
-                    else:
-                        res["status"] = "error"
-                        res["result"] = f"Unknown action: {action}"
-                except Exception as e:
-                    res["status"] = "error"
-                    res["result"] = f"{type(e).__name__}: {str(e)[:200]}"
-                _write_json(CTRL_RESULT_FILE, res)
-        except Exception:
-            pass
-
-        try:
-            status = {
-                "running": True,
-                "bot_uid": str(os.environ.get("GUEST_UID", GUEST_UID)),
-                "account_uid": str(bot_uid),
-                "region": region,
-                "nickname": CURRENT_NICK,
-                "level": CURRENT_LEVEL,
-                "exp": CURRENT_EXP,
-                "online": online_writer is not None,
-                "match_loop": MATCH_LOOP_ENABLED,
-                "match_cycles": MATCH_CYCLES,
-                "team_code": LEVEL_TEAM_CODE,
-                "level_state": LEVEL_STATE,
-                "match_duration": MATCH_STAY_DURATION,
-                "squad_owner": SQUAD_OWNER,
-                "uptime": int(time.time() - BOT_START_TIME),
-                "started_at": BOT_START_TIME,
-                "updated_at": time.time(),
-            }
-            _write_json(STATUS_FILE, status)
-        except Exception:
-            pass
-        await asyncio.sleep(2)
 
 async def handle_badge_command(cmd, inPuTMsG, uid, chat_id, key, iv, region, chat_type):
     parts = inPuTMsG.strip().split()
@@ -1583,50 +1342,27 @@ def get_ghost_api(team_code, ghost_name):
 
 def send_like(target_uid):
     try:
-        jwt = BOT_JWT
-        server_url = BOT_SERVER_URL
-        if not jwt or not server_url:
-            return "[C][B][FF0000]Failed to send like (not logged in)."
-        import requests as _req
-        from Crypto.Cipher import AES
-        from Crypto.Util.Padding import pad
-        from xDL import Key, Iv
-
-        def _varint(n):
-            out = bytearray()
-            while True:
-                b = n & 0x7F
-                n >>= 7
-                if n:
-                    b |= 0x80
-                out.append(b)
-                if not n:
-                    return bytes(out)
-
-        body = bytes([0x08]) + _varint(int(target_uid)) + bytes([0x12, 0x03]) + b"IND"
-        payload = AES.new(Key, AES.MODE_CBC, Iv).encrypt(pad(body, AES.block_size))
-        headers = {
-            "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 13; A063 Build/TKQ1.221220.001)",
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "Content-Type": "application/octet-stream",
-            "Expect": "100-continue",
-            "Authorization": f"Bearer {jwt}",
-            "X-Unity-Version": "2018.4.11f1",
-            "X-GA": "v1 1",
-            "ReleaseVersion": "OB54",
-        }
-        res = _req.post(f"{server_url}/LikeProfile", data=payload, headers=headers, timeout=20)
+        url = f"https://stargvhuuvjpy.vercel.app/like?uid={uid}&server_name=ind"
+        res = requests.get(url, timeout=10)
         if res.status_code != 200:
             return "[C][B][FF0000]Failed to send like (API error)."
+        data = res.json()
+        likes_given = int(data.get("LikesGivenByAPI", 0))
+        raw_uid = str(data.get("UID", target_uid))
+        styled_uid = fixnum(raw_uid)
+        if likes_given <= 0:
+            return (
+                f"[C][B][FFA500]Max likes already sent today.\n"
+                f"[C][B][FFFFFF]🆔 UID: {styled_uid}"
+            )
         return (
             f"[C][B]-┌ [FFD700]Like Sent Successfully:\n"
-            f"[FFFFFF]-├─ UID: {fixnum(str(target_uid))}\n"
-            f"- ├─ Likes Given: 1\n"
-            f"- └─ Daily limit enforced by game server"
+            f"[FFFFFF]-├─ Name: {data.get('PlayerNickname', 'N/A')}\n"
+            f"- ├─ UID: {styled_uid}\n"
+            f"- ├─ Likes Before: {data.get('LikesbeforeCommand', 'N/A')}\n"
+            f"- ├─ Likes Given: {data.get('LikesGivenByAPI', '0')}\n"
+            f"- └─ Likes After: {data.get('LikesafterCommand', 'N/A')}"
         )
-    except Exception as e:
-        return f"[C][B][FF0000]Error: {e}"
     except Exception as e:
         return f"[C][B][FF0000]Error: {e}"
 
@@ -2570,11 +2306,8 @@ async def GeNeRaTeAccEss(uid , password):
         "client_secret": "2ee44819e9b4598845141067b281621874d0d5d7af9d8f7e00c1e54715b7d1e3",
         "client_id": "100067"}
     async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=headers, data=data) as response:
-            if response.status != 200:
-                body = (await response.text())[:120]
-                print(f"❌ Grant failed ({response.status}): {body}")
-                return (None, None)
+        async with session.post(url, headers=Hr, data=data) as response:
+            if response.status != 200: return "Failed to get access token"
             data = await response.json()
             open_id = data.get("open_id")
             access_token = data.get("access_token")
@@ -3021,7 +2754,7 @@ def get_random_evo_emote():
     return int(random.choice([evo_emotes[str(i)] for i in range(1, 19)]))
 
 async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
-    global online_writer, whisper_writer, spammer_uid, spam_chat_id, spam_uid, XX, uid, Spy, data2, Chat_Leave, fast_spam_running, fast_spam_task, custom_spam_running, custom_spam_task, spam_request_running, spam_request_task, evo_fast_spam_running, evo_fast_spam_task, evo_custom_spam_running, evo_custom_spam_task, lag_running, lag_task, spm_inv_running, spm_inv_task, last_status_packet, status_response_cache, insquad, joining_team, whisper_writer, region, exploit_running, exploit_instance, SQUAD_OWNER
+    global online_writer, whisper_writer, spammer_uid, spam_chat_id, spam_uid, XX, uid, Spy, data2, Chat_Leave, fast_spam_running, fast_spam_task, custom_spam_running, custom_spam_task, spam_request_running, spam_request_task, evo_fast_spam_running, evo_fast_spam_task, evo_custom_spam_running, evo_custom_spam_task, lag_running, lag_task, spm_inv_running, spm_inv_task, last_status_packet, status_response_cache, insquad, joining_team, whisper_writer, region, exploit_running, exploit_instance, join_confirmed
     bot_uid = 14572471551
     if insquad is not None:
         insquad = None
@@ -3061,6 +2794,7 @@ async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
                         if packet_json.get('1') in [6, 7]:
                             insquad = None
                             joining_team = False
+                            join_confirmed = False
                             continue
                     except Exception as e:
                         pass
@@ -3111,22 +2845,12 @@ async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
                         insquad = None
                         joining_team = False
                         continue
-                if data_hex[:4] in ('0500', '0514', '0515', '0519') and len(data_hex) > 100:
-                    try:
-                        packet = await DeCode_PackEt(data_hex[10:])
-                        packet_json = json.loads(packet)
-                        OwNer_UiD = await GeTRoomOwner(packet_json)
-                        if OwNer_UiD and OwNer_UiD != int(bot_uid) and SQUAD_OWNER != OwNer_UiD:
-                            SQUAD_OWNER = OwNer_UiD
-                            logging.info(f"squad owner detected: {OwNer_UiD}")
-                    except Exception as e:
-                        pass
                 if data_hex.startswith('0500') and len(data_hex) > 1000 and joining_team == False:
                     try:
                         packet = await DeCode_PackEt(data_hex[10:])
                         packet_json = json.loads(packet)
                         OwNer_UiD, CHaT_CoDe, SQuAD_CoDe = await GeTSQDaTa(packet_json)
-                        SQUAD_OWNER = OwNer_UiD
+                        join_confirmed = True
                         JoinCHaT = await AutH_Chat(3, OwNer_UiD, CHaT_CoDe, key, iv)
                         await SEndPacKeT(whisper_writer, online_writer, 'ChaT', JoinCHaT)
                     except Exception as e:
@@ -3136,7 +2860,6 @@ async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
                         packet = await DeCode_PackEt(data2.hex()[10:])
                         packet = json.loads(packet)
                         OwNer_UiD, CHaT_CoDe, SQuAD_CoDe = await GeTSQDaTa(packet)
-                        SQUAD_OWNER = OwNer_UiD
                         JoinCHaT = await AutH_Chat(3, OwNer_UiD, CHaT_CoDe, key, iv)
                         await SEndPacKeT(whisper_writer, online_writer, 'ChaT', JoinCHaT)
                         def kx_random_colour(): return "_"
@@ -4156,6 +3879,14 @@ async def TcPChaT(ip, port, AutHToKen, key, iv, LoGinDaTaUncRypTinG, ready_event
 """
                                 await dl_send_message(response.Data.chat_type, initial_msg, uid, chat_id, key, iv)
                                 auto_start_task = asyncio.create_task(auto_start_loop(team_code, uid, chat_id, response.Data.chat_type, key, iv, region))
+                        if inPuTMsG.strip() == '/stop_auto' or inPuTMsG.strip() == '/stop':
+                            if not auto_start_running:
+                                error_msg = f"[B][C][FF0000]❌ Auto start is not running!\n"
+                                await dl_send_message(response.Data.chat_type, error_msg, uid, chat_id, key, iv)
+                            else:
+                                stop_auto = True
+                                stop_msg = f"[B][C][FF0000]🛑 Auto start STOPPED for team {auto_start_teamcode}!\n"
+                                await dl_send_message(response.Data.chat_type, stop_msg, uid, chat_id, key, iv)
                         if inPuTMsG.strip().startswith('/random'):
                             parts = inPuTMsG.strip().split()
                             uids = []
@@ -4546,81 +4277,14 @@ async def TcPChaT(ip, port, AutHToKen, key, iv, LoGinDaTaUncRypTinG, ready_event
             whisper_writer = None
         await asyncio.sleep(reconnect_delay)
 
-async def level_monitor(bot_uid, token, server_url):
-    import aiohttp
-    global CURRENT_LEVEL, CURRENT_EXP, CURRENT_NICK
-    level = None
-    last = {}
-    while True:
-        try:
-            if os.path.dirname(os.path.dirname(os.path.abspath(__file__))) not in sys.path:
-                sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            import Proto.compiled.PlayerPersonalShow_pb2
-            from Utilities.until import encode_protobuf, decode_protobuf
-            encrypted = encode_protobuf({
-                "accountId": int(bot_uid),
-                "callSignSrc": 7,
-                "needGalleryInfo": False,
-                "needBlacklist": False,
-                "needSparkInfo": False,
-            }, Proto.compiled.PlayerPersonalShow_pb2.request())
-            headers = {
-                "User-Agent": "UnityPlayer/2022.3.47f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)",
-                "Accept-Encoding": "deflate, gzip",
-                "Authorization": f"Bearer {token}",
-                "X-GA": "v1 1",
-                "ReleaseVersion": "OB54",
-                "Content-Type": "application/x-www-form-urlencoded",
-                "X-Unity-Version": "2022.3.47f1",
-            }
-            async with aiohttp.ClientSession() as session:
-                async with session.post(f"{server_url}/GetPlayerPersonalShow", data=encrypted, headers=headers, timeout=20) as resp:
-                    if resp.status != 200:
-                        await asyncio.sleep(60)
-                        continue
-                    msg = decode_protobuf(await resp.read(), Proto.compiled.PlayerPersonalShow_pb2.response)
-                    info = msg.get("basicinfo", {})
-                    lv = info.get("level")
-                    if lv is None:
-                        await asyncio.sleep(60)
-                        continue
-                    if level is None:
-                        level = lv
-                        print(f"📊 Current level: {lv}")
-                    elif lv != level:
-                        print(f"🎉 LIVE LEVEL UP! Level {level} → {lv} 🎉")
-                        level = lv
-                    CURRENT_LEVEL = lv
-                    nick = info.get("nickname", "")
-                    if nick and last.get("nick") != nick:
-                        last["nick"] = nick
-                        print(f"👤 Account name: {nick}")
-                    CURRENT_NICK = nick or CURRENT_NICK
-                    exp = info.get("exp")
-                    if exp is not None and last.get("exp") != exp:
-                        last["exp"] = exp
-                        print(f"📈 EXP: {exp}")
-                    CURRENT_EXP = exp if exp is not None else CURRENT_EXP
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            print(f"⚠️ Level monitor error: {str(e)[:80]}")
-        await asyncio.sleep(45)
-
-
 async def MaiiiinE():
     import json
     import time
     from datetime import datetime
 
-    Uid = os.environ.get("GUEST_UID", '5940248956')
-    Pw = os.environ.get("GUEST_PASSWORD", 'BD1BDC8FC10F017FE0727DC67D3907EA06DA252936441CD401BFDF755833F107')
-    global GUEST_UID, GUEST_PASSWORD, BOT_START_TIME
-    GUEST_UID = Uid
-    GUEST_PASSWORD = Pw
-    BOT_START_TIME = time.time()
+    Uid, Pw = '6699482175', 'A6CA1227517C66D058039C1FEB75691ADAE7431B5D84057A9D5817A0EFEF0479'
     print("📁 Loading credentials...")
-    print(f"✅ Using account UID: {Uid} (env GUEST_UID/GUEST_PASSWORD override, default hardcoded)")
+    print("✅ Using hardcoded UID/Password")
 
     open_id, access_token = await GeNeRaTeAccEss(Uid, Pw)
     if not open_id or not access_token:
@@ -4639,11 +4303,6 @@ async def MaiiiinE():
     if not token:
         print("❌ No authentication token received!")
         return None
-
-    global BOT_JWT, BOT_SERVER_URL
-    BOT_JWT = token
-    BOT_SERVER_URL = MajoRLoGinauTh.url
-    print("✅ Native like system armed (LikeProfile)")
 
     try:
         region = getattr(MajoRLoGinauTh, 'region', 'IND')
@@ -4712,10 +4371,6 @@ async def MaiiiinE():
 
     task1 = asyncio.create_task(TcPChaT(ChaTiP, ChaTporT, AutHToKen, key, iv, LoGinDaTaUncRypTinG, ready_event, region))
     task2 = asyncio.create_task(TcPOnLine(OnLineiP, OnLineporT, key, iv, AutHToKen))
-    task3 = asyncio.create_task(level_monitor(int(TarGeT), ToKen, UrL))
-    task4 = asyncio.create_task(random_match_loop(key, iv, region, int(TarGeT)))
-    task5 = asyncio.create_task(dashboard_control_loop(key, iv, region, int(TarGeT)))
-    print("🎮 Random match auto-joiner armed (BR/CS, runs continuously)")
 
     # ---------- 加载动画（模仿第二个版本）----------
     os.system('clear')
@@ -4786,7 +4441,7 @@ async def MaiiiinE():
     print("📡 Listening for commands and invitations")
 
     try:
-        await asyncio.wait_for(asyncio.gather(task1, task2, task4, task5), timeout=30 * 60)
+        await asyncio.wait_for(asyncio.gather(task1, task2), timeout=30 * 60)
     except asyncio.TimeoutError:
         print("Auto restart after 7 hours")
         raise RestartBot()
@@ -4810,8 +4465,7 @@ async def StarTinG():
         except asyncio.TimeoutError:
             pass
         except Exception as e:
-            print(f"⚠️ Login attempt failed: {type(e).__name__}: {str(e)[:100]} — retrying in 60s")
-        await asyncio.sleep(60)
+            pass
 
 if __name__ == '__main__':
     asyncio.run(StarTinG())

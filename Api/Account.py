@@ -60,15 +60,17 @@ def get_major_login(logintoken, openid):
         dict: JSON response from the login API
     """
     # Create encrypted payload
+    # OB54: the server requires open_id_type (field 23 = "4") alongside
+    # open_id (22), login_token (29) and orign_platform_type (99).
     encrypted_payload = encode_protobuf({
         "openid": openid,
+        "openidtype": "4",
         "logintoken": logintoken,
         "platform": "4",
     }, Proto.compiled.MajorLogin_pb2.request())
 
     # API endpoint
-    # url = "https://loginbp.ggblueshark.com/MajorLogin"
-    url = "https://loginbp.ggpolarbear.com/MajorLogin"
+    url = "https://loginbp.ggblueshark.com/MajorLogin"
 
     # Headers
     headers = {
@@ -77,11 +79,9 @@ def get_major_login(logintoken, openid):
         'Accept-Encoding': "gzip",
         'Content-Type': "application/octet-stream",
         'Expect': "100-continue",
-        'Authorization': "Bearer",
         'X-Unity-Version': "2018.4.11f1",
         'X-GA': "v1 1",
-        'ReleaseVersion': RELEASEVERSION,
-        'Content-Type': "application/x-www-form-urlencoded"
+        'ReleaseVersion': RELEASEVERSION
     }
 
     # Make the request
