@@ -1,4 +1,14 @@
-__pycache__/
+**/*.bak
 *.pyc
+__pycache__/
+Configuration/DiscordConfig.json
+Configuration/BotControl.json
+Configuration/BotControlResult.json
+Configuration/BotStatus.json
+LevelUpBot/token.json
+LevelUpBot/cache.pkl
 LevelUpBot/bot.log
 LevelUpBot/bot.pid
+
+# research folders (NOT for public push until proven)
+/research-guestgen/

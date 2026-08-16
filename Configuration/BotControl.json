@@ -1,9 +1,0 @@
-{
-  "id": "cmd-1786848584130",
-  "action": "send_like",
-  "params": {
-    "target_uid": "10502299434"
-  },
-  "pending": false,
-  "at": 1786848584.1301837
-}
