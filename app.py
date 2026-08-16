@@ -266,6 +266,13 @@ def bot_process_alive():
         with open(BOT_PID_FILE) as f:
             pid = int(f.read().strip())
         os.kill(pid, 0)
+        try:
+            with open(f"/proc/{pid}/stat") as f:
+                state = f.read().split(") ")[-1].split()[0]
+            if state == "Z":
+                return False
+        except Exception:
+            pass
         return True
     except Exception:
         return False

@@ -98,6 +98,9 @@ CURRENT_LEVEL = None
 CURRENT_EXP = None
 CURRENT_NICK = None
 BOT_START_TIME = time.time()
+LEVEL_TEAM_CODE = None
+LEVEL_STATE = "idle"
+MATCH_STAY_DURATION = 780
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CTRL_FILE = os.path.join(BASE_DIR, "Configuration", "BotControl.json")
@@ -828,47 +831,56 @@ async def reset_bot_state(key, iv, region):
 
 
 async def random_match_loop(key, iv, region):
-    """Auto-join random BR/CS matches continuously so the account farms EXP.
-    Cycle: leave any squad -> open own squad -> start match -> stay in
-    lobby/matchmaking -> leave -> repeat."""
-    global online_writer, whisper_writer, MATCH_LOOP_ENABLED, MATCH_CYCLES
-    cycle = 0
+    """Level-up loop: joins the configured team (LEVEL_TEAM_CODE), spams the
+    match start, stays in the match until it ends (MATCH_STAY_DURATION), then
+    leaves and repeats. Without a team code the loop idles in waiting_team
+    state (the server ignores solo matchmaking packets entirely)."""
+    global online_writer, whisper_writer, MATCH_LOOP_ENABLED, MATCH_CYCLES, LEVEL_TEAM_CODE, LEVEL_STATE
     while True:
         try:
             if not MATCH_LOOP_ENABLED:
+                LEVEL_STATE = "idle"
                 await asyncio.sleep(2)
                 continue
-            cycle += 1
-            if online_writer is None:
+            if not LEVEL_TEAM_CODE:
+                LEVEL_STATE = "waiting_team"
                 await asyncio.sleep(5)
                 continue
-            try:
-                leave_packet = await leave_squad(key, iv, region)
-                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', leave_packet)
-            except Exception:
-                pass
-            await asyncio.sleep(1.5)
-            open_packet = await OpEnSq(key, iv, region)
-            await SEndPacKeT(whisper_writer, online_writer, 'OnLine', open_packet)
-            await asyncio.sleep(2)
+            if online_writer is None:
+                LEVEL_STATE = "reconnecting"
+                await asyncio.sleep(5)
+                continue
+            LEVEL_STATE = "joining"
+            join_packet = await join_teamcode_packet(LEVEL_TEAM_CODE, key, iv, region)
+            await SEndPacKeT(whisper_writer, online_writer, 'OnLine', join_packet)
+            await asyncio.sleep(3)
+            if online_writer is None:
+                continue
+            LEVEL_STATE = "starting"
             start_packet = await start_auto_packet(key, iv, region)
-            for _ in range(15):
+            for _ in range(180):
                 if online_writer is None:
                     break
                 await SEndPacKeT(whisper_writer, online_writer, 'OnLine', start_packet)
-                await asyncio.sleep(0.6)
-            await asyncio.sleep(30)
+                await asyncio.sleep(0.1)
+            LEVEL_STATE = f"in_match_{MATCH_STAY_DURATION}s"
+            waited = 0
+            while waited < MATCH_STAY_DURATION:
+                await asyncio.sleep(30)
+                waited += 30
+                if not MATCH_LOOP_ENABLED or not LEVEL_TEAM_CODE:
+                    break
             leave_packet = await leave_squad(key, iv, region)
             if online_writer is not None:
                 await SEndPacKeT(whisper_writer, online_writer, 'OnLine', leave_packet)
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)
             MATCH_CYCLES += 1
-            if cycle % 20 == 0:
-                print(f"🎮 Random match loop: {cycle} cycles completed")
+            LEVEL_STATE = f"cycle_{MATCH_CYCLES}_done"
+            print(f"🎮 Level-up loop: {MATCH_CYCLES} cycles (team {LEVEL_TEAM_CODE}, level {CURRENT_LEVEL}, exp {CURRENT_EXP})")
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"⚠️ Random match loop error: {str(e)[:80]}")
+            print(f"⚠️ Level-up loop error: {str(e)[:80]}")
             await asyncio.sleep(10)
 
 
@@ -892,7 +904,7 @@ async def dashboard_control_loop(key, iv, region, bot_uid):
     """Polls Configuration/BotControl.json for dashboard commands, executes them
     with the bot's own helpers, writes results to BotControlResult.json and
     heartbeats status into BotStatus.json."""
-    global MATCH_LOOP_ENABLED, MATCH_CYCLES, CURRENT_LEVEL, CURRENT_EXP, CURRENT_NICK
+    global MATCH_LOOP_ENABLED, MATCH_CYCLES, CURRENT_LEVEL, CURRENT_EXP, CURRENT_NICK, LEVEL_TEAM_CODE, LEVEL_STATE, MATCH_STAY_DURATION
     while True:
         try:
             cmd = _read_json(CTRL_FILE)
@@ -951,6 +963,21 @@ async def dashboard_control_loop(key, iv, region, bot_uid):
                     elif action == "match_loop":
                         MATCH_LOOP_ENABLED = bool(params.get("enabled"))
                         res["result"] = f"Match loop {'ON' if MATCH_LOOP_ENABLED else 'OFF'}"
+                    elif action == "set_team_code":
+                        code = str(params.get("team_code") or "").strip()
+                        if not code:
+                            raise ValueError("team_code required")
+                        LEVEL_TEAM_CODE = code
+                        res["result"] = f"Level-up team code set: {code} (loop will join + start + stay {MATCH_STAY_DURATION}s)"
+                    elif action == "clear_team_code":
+                        LEVEL_TEAM_CODE = None
+                        res["result"] = "Level-up team code cleared (loop now waiting for team)"
+                    elif action == "set_match_duration":
+                        secs = int(params.get("seconds") or 0)
+                        if secs < 60 or secs > 3600:
+                            raise ValueError("seconds must be 60-3600")
+                        MATCH_STAY_DURATION = secs
+                        res["result"] = f"In-match stay duration set to {secs}s"
                     elif action == "start_match_now":
                         pkt = await start_auto_packet(key, iv, region)
                         if not pkt:
@@ -986,6 +1013,9 @@ async def dashboard_control_loop(key, iv, region, bot_uid):
                 "online": online_writer is not None,
                 "match_loop": MATCH_LOOP_ENABLED,
                 "match_cycles": MATCH_CYCLES,
+                "team_code": LEVEL_TEAM_CODE,
+                "level_state": LEVEL_STATE,
+                "match_duration": MATCH_STAY_DURATION,
                 "uptime": int(time.time() - BOT_START_TIME),
                 "started_at": BOT_START_TIME,
                 "updated_at": time.time(),

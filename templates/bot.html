@@ -3,8 +3,8 @@
 {% block content %}
 <div class="page-head">
   <h1>Level Up Bot Console</h1>
-  <p>Run any guest account 24/7 in the background — it auto-joins random BR/CS matches to farm EXP, monitors level-ups live, and answers dashboard commands.</p>
-  <div class="hint">The bot runs as its own background process. Pick any guest from the vault (or the main account) and start it.</div>
+  <p>Run any guest account 24/7 in the background, monitor level-ups live, and answer dashboard commands.</p>
+  <div class="hint">EXP farming needs a <b>team code</b>: the game server ignores solo matchmaking packets (verified), so the bot joins a real player's squad via team code, spams match start, and stays in the match until it ends — then repeats. Set the team code below before the loop can farm.</div>
 </div>
 
 <div class="grid2">
@@ -32,6 +32,23 @@
 </div>
 
 <div class="card">
+  <h2>Level-Up Loop (EXP farming)</h2>
+  <p class="empty" style="padding:4px 2px 12px">The loop joins <b id="l_team_now">no team</b> every cycle, spams the match start for 18s, stays in the match for the full duration, then re-joins and repeats. EXP is only awarded when a match actually completes, so the host player must start real matches.</p>
+  <div class="row">
+    <div class="field"><label>Team code</label>
+      <div class="row" style="gap:8px"><input id="l_team" placeholder="e.g. 123456"><button id="l_set_team" class="ghost btn-sm">Set &amp; Farm</button><button id="l_clear_team" class="danger btn-sm">Clear</button></div>
+    </div>
+    <div class="field"><label>Stay in match (s)</label>
+      <div class="row" style="gap:8px"><input id="l_duration" placeholder="780" style="width:100px"><button id="l_set_dur" class="ghost btn-sm">Set</button></div>
+    </div>
+    <div class="field"><label>Loop</label>
+      <div class="row" style="gap:8px"><button id="c_loop_on" class="ok btn-sm">ON</button><button id="c_loop_off" class="danger btn-sm">OFF</button></div>
+    </div>
+  </div>
+  <div class="msg" id="l_msg"></div>
+</div>
+
+<div class="card">
   <h2>Dashboard Commands</h2>
   <p class="empty" style="padding:4px 2px 12px">Commands execute inside the running bot process over the game connection.</p>
   <div class="row">
@@ -48,9 +65,6 @@
   <div class="row" style="margin-top:12px">
     <div class="field"><label>Send like to UID</label>
       <div class="row" style="gap:8px"><input id="c_like" placeholder="target uid"><button id="c_send_like" class="ghost btn-sm">Send</button></div>
-    </div>
-    <div class="field"><label>Match loop</label>
-      <div class="row" style="gap:8px"><button id="c_loop_on" class="ok btn-sm">Loop ON</button><button id="c_loop_off" class="danger btn-sm">Loop OFF</button><button id="c_match_now" class="ghost btn-sm">Start match now</button></div>
     </div>
     <div class="field"><label>Room</label>
       <button id="c_leave_room" class="ghost btn-sm">Leave room</button>
@@ -94,6 +108,9 @@ async function refreshBot() {
       <span class="badge">EXP <b>${data.exp ?? '—'}</b></span>
       <span class="badge">Uptime <b>${fmtUptime(data.uptime)}</b></span>
       <span class="badge">Match loop <b>${data.match_loop ? 'ON' : 'OFF'}</b></span>
+      <span class="badge">Loop state <b>${esc(data.level_state || '—')}</b></span>
+      <span class="badge">Team <b>${esc(data.team_code || '—')}</b></span>
+      <span class="badge">Stay in match <b>${data.match_duration ?? 780}s</b></span>
       <span class="badge">Cycles <b>${data.match_cycles ?? 0}</b></span>
       <span class="badge"><span class="pill on">● running</span></span>
     </div>`;
@@ -108,6 +125,9 @@ async function refreshBot() {
     const lines = data.log_tail.split('\n').filter(l => l.trim()).slice(-28);
     $('bot_log').innerHTML = lines.map(l => colorizeLog(l)).join('\n');
   }
+  if (data.team_code) $('l_team_now').textContent = data.team_code;
+  else $('l_team_now').textContent = 'no team';
+  if (data.match_duration) $('l_duration').value = data.match_duration;
   if (!on) $('bot_log').innerHTML = '<span class="c-dim">Bot offline — start it to see the live log.</span>';
 }
 refreshBot();
@@ -194,5 +214,39 @@ $('c_loop_on').onclick = () => sendCommand('match_loop', { enabled: true });
 $('c_loop_off').onclick = () => sendCommand('match_loop', { enabled: false });
 $('c_match_now').onclick = () => sendCommand('start_match_now', {});
 $('c_leave_room').onclick = () => sendCommand('leave_room', {});
+
+$('l_set_team').onclick = async () => {
+  const code = $('l_team').value.trim();
+  if (!code) return showMsg($('l_msg'), 'Enter a team code from a real player first', 'err');
+  showMsg($('l_msg'), '<span class="spinner"></span>Setting team code…', 'info');
+  const r = await api('/api/bot/command', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'set_team_code', params: { team_code: code } })
+  });
+  if (r.status === 200 && r.data.success) {
+    showMsg($('l_msg'), `✓ ${r.data.result}`, 'ok');
+    $('l_team_now').textContent = code;
+  } else showMsg($('l_msg'), `✗ ${(r.data && r.data.result) || r.data.error || 'failed'}`, 'err');
+  refreshBot();
+};
+$('l_clear_team').onclick = async () => {
+  const r = await api('/api/bot/command', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'clear_team_code', params: {} })
+  });
+  showMsg($('l_msg'), r.status === 200 ? '✓ Team code cleared — loop waiting for team' : '✗ failed', r.status === 200 ? 'ok' : 'err');
+  $('l_team_now').textContent = 'no team';
+  refreshBot();
+};
+$('l_set_dur').onclick = async () => {
+  const secs = parseInt($('l_duration').value, 10);
+  if (!secs || secs < 60 || secs > 3600) return showMsg($('l_msg'), 'Duration must be 60-3600 seconds', 'err');
+  const r = await api('/api/bot/command', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'set_match_duration', params: { seconds: secs } })
+  });
+  showMsg($('l_msg'), r.status === 200 ? `✓ ${r.data.result}` : '✗ failed', r.status === 200 ? 'ok' : 'err');
+  refreshBot();
+};
 </script>
 {% endblock %}
