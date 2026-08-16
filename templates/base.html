@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}EgoX — Free Fire Toolkit{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Space+Grotesk:wght@600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="bgfx"></div>
+<button class="burger" id="burger">☰</button>
+<aside class="sidebar" id="sidebar">
+  <div class="logo">EGO<span style="-webkit-text-fill-color:var(--txt);background:none;">X</span></div>
+  <div class="tag">Free Fire Toolkit</div>
+  <nav class="nav">
+    <a href="/"><span class="ico">◈</span> Dashboard</a>
+    <a href="/player"><span class="ico">👤</span> Player Lookup</a>
+    <a href="/likes"><span class="ico">❤</span> Send Likes</a>
+    <a href="/guests"><span class="ico">🗝</span> Guest Vault</a>
+    <a href="/bot"><span class="ico">🤖</span> Level Up Bot</a>
+  </nav>
+  <div class="foot"><span class="dot"></span>Service online<br>EgoX v2 · 2026</div>
+</aside>
+<main>
+{% block content %}{% endblock %}
+<div class="footer-note"><b>EgoX</b> — one toolkit, four tools. Guests give 1 like per target per day (max 100/target). Hover any number for the exact value, click to pin it.</div>
+</main>
+<script src="/static/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Send Likes — EgoX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Send Likes</h1>
+  <p>Boost a player's like count using the guest vault. One guest = one like per target per day.</p>
+  <div class="hint">After sending, EgoX re-fetches the target's profile to verify the likes actually landed.</div>
+</div>
+
+<div class="card">
+  <h2>Boost a Target</h2>
+  <div class="row">
+    <div class="field"><label>Target UID</label><input id="l_uid" placeholder="e.g. 10502299434" style="min-width:220px"></div>
+    <div class="field"><label>Server</label><select id="l_server">{% for s in servers %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Count (max 100)</label><input id="l_count" type="number" min="1" max="100" value="1" style="width:110px"></div>
+    <button id="btn_like">❤ Send Likes</button>
+  </div>
+  <div class="msg" id="l_msg"></div>
+
+  <div id="like_result" style="display:none;margin-top:16px;border-top:1px solid var(--line);padding-top:16px">
+    <div class="stats-grid">
+      <div class="stat"><div class="v" id="lr_likes_sent">—</div><div class="k">Likes Sent</div></div>
+      <div class="stat"><div class="v" id="lr_before">—</div><div class="k">Liked (before)</div></div>
+      <div class="stat"><div class="v" id="lr_after">—</div><div class="k">Liked (after)</div></div>
+      <div class="stat"><div class="v" id="lr_increase">—</div><div class="k">Verified Increase</div></div>
+      <div class="stat"><div class="v" id="lr_remaining">—</div><div class="k">Guests Left Today</div></div>
+    </div>
+    <div class="progress"><div class="bar" id="lr_progress"></div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Today's Activity</h2>
+  <div id="today_list"><div class="empty">Loading…</div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$('btn_like').onclick = async () => {
+  const uid = $('l_uid').value.trim(), srv = $('l_server').value, cnt = parseInt($('l_count').value) || 1;
+  if (!uid) return showMsg($('l_msg'), 'Enter a target UID', 'err');
+  hideMsg($('l_msg'));
+  showMsg($('l_msg'), '<span class="spinner"></span>Sending likes via guest accounts + verifying…', 'info');
+  const { status, data } = await api(`/send_like?uid=${encodeURIComponent(uid)}&server=${srv}&count=${cnt}`);
+  hideMsg($('l_msg'));
+  if (status === 200 && data.status === 'success') {
+    $('like_result').style.display = 'block';
+    $('lr_likes_sent').textContent = `${data.likes_sent}/${data.requested}`;
+    $('lr_before').textContent = data.liked_before ?? '—';
+    $('lr_after').textContent = data.liked_after ?? '—';
+    const inc = data.liked_increase;
+    if (inc !== undefined) {
+      $('lr_increase').textContent = (inc > 0 ? '+' : '') + inc;
+      $('lr_increase').style.background = inc > 0 ? 'linear-gradient(135deg,var(--ok),#7ae8a3)' : 'linear-gradient(135deg,var(--err),#ff8a5c)';
+      $('lr_increase').style.webkitBackgroundClip = inc > 0 ? 'text' : 'text';
+      $('lr_increase').style.color = inc > 0 ? '' : 'transparent';
+      $('lr_progress').style.width = Math.min(100, inc * 10) + '%';
+      $('lr_progress').className = 'bar' + (inc > 0 ? ' ok' : '');
+    } else {
+      $('lr_increase').textContent = '?';
+    }
+    $('lr_remaining').textContent = data.guests_remaining_today;
+    let extra = '';
+    if (data.warnings && data.warnings.length) extra = `\nWarnings:\n${data.warnings.join('\n')}`;
+    if (data.bot_fallback) extra = '\n(Bot JWT fallback used — 1 like sent)';
+    if (inc === 0 && data.likes_sent > 0) {
+      extra += '\n⚠ The API answered 200 but the target\'s liked count did NOT move — the game server is silently dropping likes from guest/emulator accounts. Only likes from real, non-emulator accounts count.';
+      showMsg($('l_msg'),
+        `⚠ Sent ${data.likes_sent}/${data.requested} likes to ${data.uid} but NONE verified\nLikes on target today: ${data.total_likes_on_target_today}\nGuests remaining today: ${data.guests_remaining_today}` + extra, 'err');
+    } else {
+      showMsg($('l_msg'),
+        `✓ Sent ${data.likes_sent}/${data.requested} likes to ${data.uid}\nLikes on target today: ${data.total_likes_on_target_today}\nGuests remaining today: ${data.guests_remaining_today}` + extra, 'ok');
+    }
+    loadToday();
+  } else {
+    $('like_result').style.display = 'none';
+    showMsg($('l_msg'), `✗ ${(data && data.error) || 'Failed to send likes'}`, 'err');
+  }
+};
+$('l_uid').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn_like').click(); });
+
+async function loadToday() {
+  const { status, data } = await api('/api/likes/today');
+  if (status !== 200 || !data.success) { $('today_list').innerHTML = '<div class="empty">Failed to load activity.</div>'; return; }
+  const entries = Object.entries(data.per_target || {});
+  if (!entries.length) { $('today_list').innerHTML = '<div class="empty">No likes sent yet today — the day resets at midnight.</div>'; return; }
+  $('today_list').innerHTML = `<div class="empty" style="padding:8px 4px">${data.date} · ${data.likes_today} likes · ${data.targets_today} targets</div>
+  <table><tr><th>Target UID</th><th>Likes Today</th></tr>${entries.map(([t, n]) => `<tr><td class="mono">${t}</td><td><b>${n}</b></td></tr>`).join('')}</table>`;
+}
+loadToday();
+</script>
+{% endblock %}

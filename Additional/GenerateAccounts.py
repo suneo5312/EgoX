@@ -91,14 +91,12 @@ def register(region):
     return None, None, None
 
 
-def main():
-    regions = ['IND']
-    per_region = 5
-    if len(sys.argv) > 1:
-        per_region = max(1, int(sys.argv[1]))
-
-    bank_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                             "Configuration", "GuestAccounts.json")
+def generate_guests(region="IND", count=5, bank_path=None):
+    """Create `count` fresh guest accounts for `region` and append to the bank.
+    Returns (created, bank) where created is a list of {"uid", "password"} dicts."""
+    if bank_path is None:
+        bank_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                 "Configuration", "GuestAccounts.json")
     try:
         with open(bank_path) as f:
             bank = json.load(f)
@@ -107,28 +105,42 @@ def main():
     if not isinstance(bank, dict):
         bank = {}
 
-    for r in regions:
-        gl = bank.get(r, [])
-        if not isinstance(gl, list):
-            gl = []
-        existing = {str(g.get("uid")) for g in gl}
-        created = 0
-        for _ in range(per_region * 3):
-            if created >= per_region:
-                break
-            uid, ph, _ = register(r)
-            if uid and str(uid) not in existing:
-                gl.append({"uid": str(uid), "password": ph})
-                existing.add(str(uid))
-                created += 1
-                print(f"[{r}] created guest {uid}")
-            else:
-                print(f"[{r}] register attempt failed or duplicate, retrying...")
-        bank[r] = gl
+    gl = bank.get(region, [])
+    if not isinstance(gl, list):
+        gl = []
+    existing = {str(g.get("uid")) for g in gl}
+    created = 0
+    made = []
+    for _ in range(count * 3):
+        if created >= count:
+            break
+        uid, ph, _ = register(region)
+        if uid and str(uid) not in existing:
+            gl.append({"uid": str(uid), "password": ph})
+            existing.add(str(uid))
+            created += 1
+            made.append({"uid": str(uid), "password": ph})
+            print(f"[{region}] created guest {uid}")
+        else:
+            print(f"[{region}] register attempt failed or duplicate, retrying...")
 
+    bank[region] = gl
     with open(bank_path, "w") as f:
         json.dump(bank, f, indent=4)
-    print(f"Saved {len(bank.get('IND', []))} IND guests to GuestAccounts.json")
+    print(f"Saved {len(bank.get(region, []))} {region} guests to GuestAccounts.json")
+    return made, bank
+
+
+def main():
+    regions = ['IND']
+    per_region = 5
+    if len(sys.argv) > 1:
+        per_region = max(1, int(sys.argv[1]))
+
+    for r in regions:
+        made, _ = generate_guests(r, per_region)
+        for g in made:
+            print(f"  -> {g['uid']} / {g['password']}")
 
 
 if __name__ == "__main__":

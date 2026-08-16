@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Guest Vault — EgoX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Guest Vault</h1>
+  <p>Generate fresh guest accounts (live registration via connect.garena.com), monitor them, and manage the vault.</p>
+  <div class="hint">Generation takes ~5-15s per guest. Guests are used automatically by the like booster (1 like per target per day).</div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Generate Guests</h2>
+    <div class="row">
+      <div class="field"><label>Server</label><select id="gen_server">{% for s in servers %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Count (1-20)</label><input id="gen_count" type="number" min="1" max="20" value="5" style="width:110px"></div>
+      <button id="btn_gen">⚡ Generate</button>
+    </div>
+    <div class="progress"><div class="bar" id="gen_progress"></div></div>
+    <div class="msg" id="gen_msg"></div>
+    <div id="gen_result" style="display:none;margin-top:10px">
+      <div class="empty" id="gen_result_text"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Add Manually</h2>
+    <div class="row">
+      <div class="field"><label>Guest UID</label><input id="g_uid" placeholder="e.g. 6603148404"></div>
+      <div class="field"><label>Password (sha256)</label><input id="g_pw" class="mono" placeholder="e.g. 86BAC9..." style="min-width:220px"></div>
+      <button id="btn_add_manual">Add Guest</button>
+    </div>
+    <div class="field" style="margin-top:14px">
+      <label>Or paste guest JSON (auto-extract)</label>
+      <textarea id="g_json" placeholder='{"uid":"6603148404","password":"86BAC99A..."}  — or a list / whole bank JSON'></textarea>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="btn_add_json" class="ghost">Auto-Extract &amp; Add</button>
+    </div>
+    <div class="msg" id="g_msg"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Vault Monitor</h2>
+  <div class="row" style="margin-bottom:4px">
+    <div class="field"><label>Filter</label><select id="g_server">{% for s in servers %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></div>
+    <button id="btn_refresh" class="ghost">↻ Refresh</button>
+    <div class="empty" id="g_summary" style="padding:10px 4px"></div>
+  </div>
+  <div id="g_list"><div class="empty">Loading…</div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$('btn_gen').onclick = async () => {
+  const srv = $('gen_server').value, cnt = parseInt($('gen_count').value) || 5;
+  hideMsg($('gen_msg'));
+  showMsg($('gen_msg'), `<span class="spinner"></span>Generating ${cnt} guests on ${srv}… (live registration, can take a couple of minutes)`, 'info');
+  $('gen_progress').style.width = '15%';
+  const { status, data } = await api('/api/guests/generate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ server: srv, count: cnt })
+  });
+  $('gen_progress').style.width = '100%';
+  setTimeout(() => { $('gen_progress').style.width = '0%'; }, 1500);
+  if (status === 200 && data.success) {
+    hideMsg($('gen_msg'));
+    $('gen_result').style.display = 'block';
+    $('gen_result_text').textContent = `✓ Created ${data.count} new guest(s) on ${data.server} and added them to the vault.`;
+    showMsg($('gen_msg'), (data.created || []).map(g => `🗝 ${g.uid} / ${g.password}`).join('\n'), 'ok');
+    refreshGuests();
+  } else {
+    showMsg($('gen_msg'), `✗ ${(data && data.error) || 'Generation failed'}`, 'err');
+  }
+};
+
+function guestRow(g) {
+  const shown = g.password ? g.password.slice(0, 12) + '…' : '—';
+  const statusPill = g.likes_sent > 0
+    ? `<span class="pill warn">used ${g.likes_sent}×</span>`
+    : '<span class="pill on">fresh</span>';
+  return `<tr>
+    <td class="mono">${g.uid}</td>
+    <td class="mono pw" title="Click to reveal" onclick="togglePw(this,'${esc(g.password)}')">${shown}</td>
+    <td>${statusPill}</td>
+    <td><button class="danger btn-sm" onclick="removeGuest('${g.uid}')">Remove</button></td>
+  </tr>`;
+}
+
+async function refreshGuests() {
+  const srv = $('g_server').value;
+  const { status, data } = await api('/api/guests');
+  if (status !== 200 || !data.success) { $('g_list').innerHTML = '<div class="empty">Failed to load guests.</div>'; return; }
+  const all = data.guests || {};
+  const servers = Object.keys(all);
+  if (servers.length && !servers.includes(srv)) { $('g_server').value = servers[0]; return refreshGuests(); }
+  const list = all[srv] || [];
+  let total = 0, used = 0;
+  list.forEach(g => { total += g.likes_sent; if (g.likes_sent > 0) used++; });
+  $('g_summary').textContent = `${list.length} guests · ${used} used · ${total} likes sent from vault`;
+  if (!list.length) {
+    $('g_list').innerHTML = `<div class="empty">No guest accounts in the vault for ${srv}. Generate fresh ones above, or paste the EXTRACT JSON from the app.</div>`;
+    return;
+  }
+  $('g_list').innerHTML = `<table><tr><th>Guest UID</th><th>Password</th><th>Status</th><th></th></tr>${list.map(guestRow).join('')}</table>`;
+}
+$('btn_refresh').onclick = refreshGuests;
+$('g_server').onchange = refreshGuests;
+
+async function addResult(msg, type) { showMsg($('g_msg'), msg, type); await refreshGuests(); }
+$('btn_add_manual').onclick = async () => {
+  const uid = $('g_uid').value.trim(), pw = $('g_pw').value.trim();
+  if (!uid || !pw) return showMsg($('g_msg'), 'Enter both UID and password', 'err');
+  hideMsg($('g_msg'));
+  const { status, data } = await api('/api/guests/add', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ server: $('g_server').value, uid, password: pw })
+  });
+  if (status === 200 && data.success) { addResult(`✓ Added guest ${uid} (${data.added} added, ${data.total} total)`, 'ok'); $('g_uid').value = ''; $('g_pw').value = ''; }
+  else showMsg($('g_msg'), `✗ ${(data && data.error) || 'Failed'}`, 'err');
+};
+$('btn_add_json').onclick = async () => {
+  const j = $('g_json').value.trim();
+  if (!j) return showMsg($('g_msg'), 'Paste some JSON first', 'err');
+  hideMsg($('g_msg'));
+  showMsg($('g_msg'), '<span class="spinner"></span>Extracting guest accounts…', 'info');
+  const { status, data } = await api('/api/guests/add', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ server: $('g_server').value, json_text: j })
+  });
+  if (status === 200 && data.success) { addResult(`✓ Extracted & added ${data.added} guest(s) — vault now has ${data.total} for ${data.server}`, 'ok'); $('g_json').value = ''; }
+  else showMsg($('g_msg'), `✗ ${(data && data.error) || 'Failed'}`, 'err');
+};
+async function removeGuest(uid) {
+  if (!confirm(`Remove guest ${uid} from the vault?`)) return;
+  const { status, data } = await api('/api/guests/remove', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ server: $('g_server').value, uid })
+  });
+  if (status === 200 && data.success) addResult(`✓ Removed ${uid}`, 'ok');
+  else showMsg($('g_msg'), `✗ ${(data && data.error) || 'Failed'}`, 'err');
+}
+
+refreshGuests();
+setInterval(refreshGuests, 20000);
+</script>
+{% endblock %}

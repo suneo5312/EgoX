@@ -92,6 +92,18 @@ BADGE_REQUESTS = 5
 exploit_running = False
 exploit_instance = None
 
+MATCH_LOOP_ENABLED = True
+MATCH_CYCLES = 0
+CURRENT_LEVEL = None
+CURRENT_EXP = None
+CURRENT_NICK = None
+BOT_START_TIME = time.time()
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CTRL_FILE = os.path.join(BASE_DIR, "Configuration", "BotControl.json")
+CTRL_RESULT_FILE = os.path.join(BASE_DIR, "Configuration", "BotControlResult.json")
+STATUS_FILE = os.path.join(BASE_DIR, "Configuration", "BotStatus.json")
+
 evo_emotes = {
     "1": "909000063",
     "2": "909000068",
@@ -819,10 +831,13 @@ async def random_match_loop(key, iv, region):
     """Auto-join random BR/CS matches continuously so the account farms EXP.
     Cycle: leave any squad -> open own squad -> start match -> stay in
     lobby/matchmaking -> leave -> repeat."""
-    global online_writer, whisper_writer
+    global online_writer, whisper_writer, MATCH_LOOP_ENABLED, MATCH_CYCLES
     cycle = 0
     while True:
         try:
+            if not MATCH_LOOP_ENABLED:
+                await asyncio.sleep(2)
+                continue
             cycle += 1
             if online_writer is None:
                 await asyncio.sleep(5)
@@ -847,6 +862,7 @@ async def random_match_loop(key, iv, region):
             if online_writer is not None:
                 await SEndPacKeT(whisper_writer, online_writer, 'OnLine', leave_packet)
             await asyncio.sleep(3)
+            MATCH_CYCLES += 1
             if cycle % 20 == 0:
                 print(f"🎮 Random match loop: {cycle} cycles completed")
         except asyncio.CancelledError:
@@ -854,6 +870,130 @@ async def random_match_loop(key, iv, region):
         except Exception as e:
             print(f"⚠️ Random match loop error: {str(e)[:80]}")
             await asyncio.sleep(10)
+
+
+def _write_json(path, data):
+    try:
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        pass
+
+
+def _read_json(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+async def dashboard_control_loop(key, iv, region, bot_uid):
+    """Polls Configuration/BotControl.json for dashboard commands, executes them
+    with the bot's own helpers, writes results to BotControlResult.json and
+    heartbeats status into BotStatus.json."""
+    global MATCH_LOOP_ENABLED, MATCH_CYCLES, CURRENT_LEVEL, CURRENT_EXP, CURRENT_NICK
+    while True:
+        try:
+            cmd = _read_json(CTRL_FILE)
+            if cmd and cmd.get("pending"):
+                cmd["pending"] = False
+                _write_json(CTRL_FILE, cmd)
+                action = cmd.get("action") or ""
+                params = cmd.get("params") or {}
+                cid = cmd.get("id", "cmd")
+                res = {"id": cid, "action": action, "status": "done", "result": "", "at": time.time()}
+                try:
+                    if action == "join_room":
+                        room_id = str(params.get("room_id") or "")
+                        password = str(params.get("password") or "")
+                        if not room_id:
+                            raise ValueError("room_id required")
+                        await reset_bot_state(key, iv, region)
+                        await asyncio.sleep(1)
+                        pkt = await RoomJoin(room_id, password, key, iv)
+                        if not pkt:
+                            raise RuntimeError("failed to build room join packet")
+                        await SEndPacKeT(whisper_writer, online_writer, 'OnLine', pkt)
+                        res["result"] = f"Joined room {room_id}" + (f" (pass: {password})" if password else "")
+                    elif action == "leave_room":
+                        pkt = await XRLeaveRoom(int(bot_uid), key, iv)
+                        if not pkt:
+                            raise RuntimeError("failed to build leave packet")
+                        await SEndPacKeT(whisper_writer, online_writer, 'OnLine', pkt)
+                        res["result"] = "Left room"
+                    elif action == "join_team":
+                        code = str(params.get("team_code") or "")
+                        if not code:
+                            raise ValueError("team_code required")
+                        await reset_bot_state(key, iv, region)
+                        await asyncio.sleep(1)
+                        pkt = await join_teamcode_packet(code, key, iv, region)
+                        if not pkt:
+                            raise RuntimeError("failed to build team join packet")
+                        await SEndPacKeT(whisper_writer, online_writer, 'OnLine', pkt)
+                        res["result"] = f"Joined team {code}"
+                    elif action == "join_guild":
+                        gid = str(params.get("guild_id") or "")
+                        if not gid:
+                            raise ValueError("guild_id required")
+                        res["result"] = join_guild(gid)
+                    elif action == "leave_guild":
+                        gid = str(params.get("guild_id") or "")
+                        if not gid:
+                            raise ValueError("guild_id required")
+                        res["result"] = leave_guild(gid)
+                    elif action == "send_like":
+                        target = str(params.get("target_uid") or "")
+                        if not target:
+                            raise ValueError("target_uid required")
+                        res["result"] = send_like(int(target))
+                    elif action == "match_loop":
+                        MATCH_LOOP_ENABLED = bool(params.get("enabled"))
+                        res["result"] = f"Match loop {'ON' if MATCH_LOOP_ENABLED else 'OFF'}"
+                    elif action == "start_match_now":
+                        pkt = await start_auto_packet(key, iv, region)
+                        if not pkt:
+                            raise RuntimeError("failed to build start packet")
+                        await SEndPacKeT(whisper_writer, online_writer, 'OnLine', pkt)
+                        res["result"] = "Match start requested"
+                    elif action == "stop_bot":
+                        res["result"] = "Bot stopping (dashboard request)"
+                        _write_json(CTRL_RESULT_FILE, res)
+                        _write_json(STATUS_FILE, {
+                            "running": False, "stopped_by_dashboard": True, "at": time.time()
+                        })
+                        os._exit(0)
+                    else:
+                        res["status"] = "error"
+                        res["result"] = f"Unknown action: {action}"
+                except Exception as e:
+                    res["status"] = "error"
+                    res["result"] = f"{type(e).__name__}: {str(e)[:200]}"
+                _write_json(CTRL_RESULT_FILE, res)
+        except Exception:
+            pass
+
+        try:
+            status = {
+                "running": True,
+                "bot_uid": str(os.environ.get("GUEST_UID", GUEST_UID)),
+                "account_uid": str(bot_uid),
+                "region": region,
+                "nickname": CURRENT_NICK,
+                "level": CURRENT_LEVEL,
+                "exp": CURRENT_EXP,
+                "online": online_writer is not None,
+                "match_loop": MATCH_LOOP_ENABLED,
+                "match_cycles": MATCH_CYCLES,
+                "uptime": int(time.time() - BOT_START_TIME),
+                "started_at": BOT_START_TIME,
+                "updated_at": time.time(),
+            }
+            _write_json(STATUS_FILE, status)
+        except Exception:
+            pass
+        await asyncio.sleep(2)
 
 async def handle_badge_command(cmd, inPuTMsG, uid, chat_id, key, iv, region, chat_type):
     parts = inPuTMsG.strip().split()
@@ -4324,6 +4464,7 @@ async def TcPChaT(ip, port, AutHToKen, key, iv, LoGinDaTaUncRypTinG, ready_event
 
 async def level_monitor(bot_uid, token, server_url):
     import aiohttp
+    global CURRENT_LEVEL, CURRENT_EXP, CURRENT_NICK
     level = None
     last = {}
     while True:
@@ -4365,14 +4506,17 @@ async def level_monitor(bot_uid, token, server_url):
                     elif lv != level:
                         print(f"🎉 LIVE LEVEL UP! Level {level} → {lv} 🎉")
                         level = lv
+                    CURRENT_LEVEL = lv
                     nick = info.get("nickname", "")
                     if nick and last.get("nick") != nick:
                         last["nick"] = nick
                         print(f"👤 Account name: {nick}")
+                    CURRENT_NICK = nick or CURRENT_NICK
                     exp = info.get("exp")
                     if exp is not None and last.get("exp") != exp:
                         last["exp"] = exp
                         print(f"📈 EXP: {exp}")
+                    CURRENT_EXP = exp if exp is not None else CURRENT_EXP
         except asyncio.CancelledError:
             break
         except Exception as e:
@@ -4387,6 +4531,10 @@ async def MaiiiinE():
 
     Uid = os.environ.get("GUEST_UID", '5940248956')
     Pw = os.environ.get("GUEST_PASSWORD", 'BD1BDC8FC10F017FE0727DC67D3907EA06DA252936441CD401BFDF755833F107')
+    global GUEST_UID, GUEST_PASSWORD, BOT_START_TIME
+    GUEST_UID = Uid
+    GUEST_PASSWORD = Pw
+    BOT_START_TIME = time.time()
     print("📁 Loading credentials...")
     print(f"✅ Using account UID: {Uid} (env GUEST_UID/GUEST_PASSWORD override, default hardcoded)")
 
@@ -4482,6 +4630,7 @@ async def MaiiiinE():
     task2 = asyncio.create_task(TcPOnLine(OnLineiP, OnLineporT, key, iv, AutHToKen))
     task3 = asyncio.create_task(level_monitor(int(TarGeT), ToKen, UrL))
     task4 = asyncio.create_task(random_match_loop(key, iv, region))
+    task5 = asyncio.create_task(dashboard_control_loop(key, iv, region, int(TarGeT)))
     print("🎮 Random match auto-joiner armed (BR/CS, runs continuously)")
 
     # ---------- 加载动画（模仿第二个版本）----------
@@ -4553,7 +4702,7 @@ async def MaiiiinE():
     print("📡 Listening for commands and invitations")
 
     try:
-        await asyncio.wait_for(asyncio.gather(task1, task2, task4), timeout=30 * 60)
+        await asyncio.wait_for(asyncio.gather(task1, task2, task4, task5), timeout=30 * 60)
     except asyncio.TimeoutError:
         print("Auto restart after 7 hours")
         raise RestartBot()

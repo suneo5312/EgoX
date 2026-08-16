@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Level Up Bot — EgoX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Level Up Bot Console</h1>
+  <p>Run any guest account 24/7 in the background — it auto-joins random BR/CS matches to farm EXP, monitors level-ups live, and answers dashboard commands.</p>
+  <div class="hint">The bot runs as its own background process. Pick any guest from the vault (or the main account) and start it.</div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Bot Status</h2>
+    <div id="bot_status"><div class="empty">Loading…</div></div>
+    <div class="progress"><div class="bar" id="bot_bar"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>Start / Stop</h2>
+    <div class="row">
+      <div class="field"><label>Account UID</label><input id="b_uid" placeholder="e.g. 6603148404" style="min-width:180px"></div>
+      <div class="field"><label>Password (sha256)</label><input id="b_pw" class="mono" placeholder="e.g. 86BAC9..." style="min-width:200px"></div>
+      <div class="field"><label>Region</label><select id="b_region"><option>IND</option><option>BD</option><option>TH</option><option>ID</option><option>VN</option></select></div>
+      <button id="btn_start">▶ Start Bot</button>
+      <button id="btn_stop" class="danger">■ Stop Bot</button>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label>Pick from vault</label>
+      <select id="b_pick" style="margin-bottom:8px"></select>
+    </div>
+    <div class="msg" id="b_msg"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Dashboard Commands</h2>
+  <p class="empty" style="padding:4px 2px 12px">Commands execute inside the running bot process over the game connection.</p>
+  <div class="row">
+    <div class="field"><label>Join Room</label>
+      <div class="row" style="gap:8px"><input id="c_room_id" placeholder="room id"><input id="c_room_pw" placeholder="password (optional)" style="width:150px"><button id="c_join_room" class="ghost btn-sm">Join</button></div>
+    </div>
+    <div class="field"><label>Join Team (code)</label>
+      <div class="row" style="gap:8px"><input id="c_team" placeholder="team code"><button id="c_join_team" class="ghost btn-sm">Join</button></div>
+    </div>
+    <div class="field"><label>Guild ID</label>
+      <div class="row" style="gap:8px"><input id="c_guild" placeholder="guild id"><button id="c_join_guild" class="ghost btn-sm">Join Guild</button><button id="c_leave_guild" class="ghost btn-sm">Leave Guild</button></div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <div class="field"><label>Send like to UID</label>
+      <div class="row" style="gap:8px"><input id="c_like" placeholder="target uid"><button id="c_send_like" class="ghost btn-sm">Send</button></div>
+    </div>
+    <div class="field"><label>Match loop</label>
+      <div class="row" style="gap:8px"><button id="c_loop_on" class="ok btn-sm">Loop ON</button><button id="c_loop_off" class="danger btn-sm">Loop OFF</button><button id="c_match_now" class="ghost btn-sm">Start match now</button></div>
+    </div>
+    <div class="field"><label>Room</label>
+      <button id="c_leave_room" class="ghost btn-sm">Leave room</button>
+    </div>
+  </div>
+  <div class="msg" id="c_msg"></div>
+  <div id="c_result" style="display:none;margin-top:12px">
+    <div class="console" id="c_result_text" style="max-height:140px"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Live Log</h2>
+  <div class="console" id="bot_log"><span class="c-dim">Waiting for log…</span></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ACTIONS = {
+  join_room: ['room_id', 'c_room_id'], join_team: ['team_code', 'c_team'],
+  join_guild: ['guild_id', 'c_guild'], leave_guild: ['guild_id', 'c_guild'],
+  send_like: ['target_uid', 'c_like'],
+};
+const BTN_ACTIONS = {
+  c_join_room: 'join_room', c_join_team: 'join_team',
+  c_join_guild: 'join_guild', c_leave_guild: 'leave_guild', c_send_like: 'send_like',
+};
+
+async function refreshBot() {
+  const { status, data } = await api('/api/bot/status');
+  if (status !== 200) return;
+  const on = !!data.running;
+  const s = $('bot_status');
+  if (on) {
+    s.innerHTML = `<div class="badges">
+      <span class="badge">Account <b>${esc(data.account_uid || data.bot_uid || '—')}</b></span>
+      <span class="badge">Region <b>${esc(data.region || '—')}</b></span>
+      <span class="badge">Nick <b>${esc(data.nickname || '—')}</b></span>
+      <span class="badge">Level <b>${data.level ?? '—'}</b></span>
+      <span class="badge">EXP <b>${data.exp ?? '—'}</b></span>
+      <span class="badge">Uptime <b>${fmtUptime(data.uptime)}</b></span>
+      <span class="badge">Match loop <b>${data.match_loop ? 'ON' : 'OFF'}</b></span>
+      <span class="badge">Cycles <b>${data.match_cycles ?? 0}</b></span>
+      <span class="badge"><span class="pill on">● running</span></span>
+    </div>`;
+    $('bot_bar').className = 'bar ok';
+    $('bot_bar').style.width = '100%';
+  } else {
+    s.innerHTML = `<div class="empty">Bot is <b style="color:var(--err)">offline</b>. Pick an account from the vault (or the main account) and hit Start.</div>`;
+    $('bot_bar').className = 'bar';
+    $('bot_bar').style.width = '8%';
+  }
+  if (data.log_tail) {
+    const lines = data.log_tail.split('\n').filter(l => l.trim()).slice(-28);
+    $('bot_log').innerHTML = lines.map(l => colorizeLog(l)).join('\n');
+  }
+  if (!on) $('bot_log').innerHTML = '<span class="c-dim">Bot offline — start it to see the live log.</span>';
+}
+refreshBot();
+setInterval(refreshBot, 5000);
+
+async function loadVaultPick() {
+  const { status, data } = await api('/api/guests');
+  if (status !== 200 || !data.success) return;
+  const sel = $('b_pick');
+  sel.innerHTML = '<option value="">— choose from vault —</option>';
+  for (const [srv, list] of Object.entries(data.guests || {})) {
+    for (const g of (list || [])) {
+      const opt = document.createElement('option');
+      opt.value = `${srv}|${g.uid}|${g.password}`;
+      opt.textContent = `${srv} · ${g.uid} (used ${g.likes_sent}×)`;
+      sel.appendChild(opt);
+    }
+  }
+  sel.onchange = () => {
+    if (!sel.value) return;
+    const [srv, uid, pw] = sel.value.split('|');
+    $('b_uid').value = uid;
+    $('b_pw').value = pw;
+    $('b_region').value = srv.replace(/[0-9]/g, '') || 'IND';
+  };
+}
+loadVaultPick();
+
+$('btn_start').onclick = async () => {
+  const uid = $('b_uid').value.trim(), pw = $('b_pw').value.trim(), region = $('b_region').value;
+  if (!uid || !pw) return showMsg($('b_msg'), 'Pick an account from the vault or enter uid + password', 'err');
+  hideMsg($('b_msg'));
+  showMsg($('b_msg'), '<span class="spinner"></span>Starting bot process… (login takes ~30-60s)', 'info');
+  const { status, data } = await api('/api/bot/start', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uid, password: pw, region })
+  });
+  if (status === 200 && data.success) showMsg($('b_msg'), `✓ Bot started (PID ${data.pid}) for account ${data.uid}. It will auto-join matches and level up 24/7.`, 'ok');
+  else showMsg($('b_msg'), `✗ ${(data && data.error) || 'Failed to start'}`, 'err');
+  refreshBot();
+};
+
+$('btn_stop').onclick = async () => {
+  if (!confirm('Stop the level-up bot process?')) return;
+  hideMsg($('b_msg'));
+  showMsg($('b_msg'), '<span class="spinner"></span>Stopping bot…', 'info');
+  const { status, data } = await api('/api/bot/stop', { method: 'POST' });
+  showMsg($('b_msg'), status === 200 ? '✓ Bot stopped.' : `✗ ${(data && data.error) || 'Failed'}`, status === 200 ? 'ok' : 'err');
+  refreshBot();
+};
+
+async function sendCommand(action, params) {
+  showMsg($('c_msg'), `<span class="spinner"></span>${action}…`, 'info');
+  $('c_result').style.display = 'none';
+  const { status, data } = await api('/api/bot/command', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, params })
+  });
+  if (status === 200) {
+    $('c_result').style.display = 'block';
+    $('c_result_text').textContent = `→ ${action}: ${data.result || 'done'}`;
+    $('c_result_text').className = 'console' + (data.success ? '' : '');
+    showMsg($('c_msg'), data.success ? `✓ ${data.result}` : `✗ ${data.result}`, data.success ? 'ok' : 'err');
+  } else {
+    showMsg($('c_msg'), `✗ ${(data && data.error) || 'Command failed'}`, 'err');
+  }
+  refreshBot();
+}
+
+for (const [btnId, action] of Object.entries(BTN_ACTIONS)) {
+  $(btnId).onclick = () => {
+    const [param, inputId] = ACTIONS[action];
+    const val = $(inputId).value.trim();
+    const params = {};
+    if (param === 'room_id') { params.room_id = val; params.password = $('c_room_pw').value.trim(); }
+    else if (param === 'guild_id') params.guild_id = val;
+    else if (param === 'team_code') params.team_code = val;
+    else if (param === 'target_uid') params.target_uid = val;
+    if (!val) return showMsg($('c_msg'), 'Fill in the required field first', 'err');
+    sendCommand(action, params);
+  };
+}
+$('c_loop_on').onclick = () => sendCommand('match_loop', { enabled: true });
+$('c_loop_off').onclick = () => sendCommand('match_loop', { enabled: false });
+$('c_match_now').onclick = () => sendCommand('start_match_now', {});
+$('c_leave_room').onclick = () => sendCommand('leave_room', {});
+</script>
+{% endblock %}

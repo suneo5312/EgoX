@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Player Lookup — EgoX{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Player Lookup</h1>
+  <p>Pull a player's profile and full career stats — BR solo / duo / squad and CS.</p>
+  <div class="hint">Tip: use the player's in-game UID (the number in their profile).</div>
+</div>
+
+<div class="card">
+  <h2>Search Player</h2>
+  <div class="row">
+    <div class="field"><label>Player UID</label><input id="p_uid" placeholder="e.g. 10502299434" style="min-width:220px"></div>
+    <div class="field"><label>Server</label><select id="p_server">{% for s in servers %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Mode</label><select id="p_mode"><option value="br">BR</option><option value="cs">CS</option></select></div>
+    <div class="field"><label>Match</label><select id="p_match"><option value="CAREER">CAREER</option><option value="NORMAL">NORMAL</option><option value="RANKED">RANKED</option></select></div>
+    <button id="btn_load">Load Player</button>
+  </div>
+  <div class="msg" id="p_msg"></div>
+  <div id="player_result" style="display:none">
+    <div class="player-head">
+      <div class="avatar" id="pl_av">?</div>
+      <div>
+        <h3 id="pl_name">—</h3>
+        <div class="sub" id="pl_sub">—</div>
+        <div class="badges">
+          <span class="badge">Level <b id="pl_level">—</b></span>
+          <span class="badge">BR Rank <b id="pl_rank">—</b></span>
+          <span class="badge">RP <b id="pl_rp">—</b></span>
+          <span class="badge">Likes <b id="pl_likes">—</b></span>
+          <span class="badge">Clan <b id="pl_clan">—</b></span>
+        </div>
+      </div>
+    </div>
+    <div id="pl_stats"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$('btn_load').onclick = async () => {
+  const uid = $('p_uid').value.trim(), srv = $('p_server').value, mode = $('p_mode').value, match = $('p_match').value;
+  if (!uid) return showMsg($('p_msg'), 'Enter a player UID', 'err');
+  hideMsg($('p_msg'));
+  showMsg($('p_msg'), '<span class="spinner"></span>Loading player… (auth + fetch can take a few seconds)', 'info');
+  const { status, data } = await api(`/api/player_info?uid=${encodeURIComponent(uid)}&server=${srv}&gamemode=${mode}&matchmode=${match}`);
+  hideMsg($('p_msg'));
+  if (status !== 200 || !data.success) { showMsg($('p_msg'), (data && data.error) || 'Failed to load player', 'err'); return; }
+  const b = data.basicinfo || {};
+  const bd = b.basicinfo || b;
+  $('player_result').style.display = 'block';
+  $('pl_av').textContent = (bd.nickname || '?').charAt(0).toUpperCase();
+  $('pl_name').textContent = bd.nickname || 'Unknown';
+  $('pl_sub').textContent = `UID ${data.uid} · ${data.server} · ${data.gamemode.toUpperCase()} · ${data.matchmode}`;
+  setStat($('pl_level'), bd.level, false, false);
+  setStat($('pl_rank'), bd.rank, false, false);
+  setStat($('pl_rp'), bd.rankingpoints, false, false);
+  setStat($('pl_likes'), bd.liked, false, false);
+  $('pl_clan').textContent = bd.clanname || '—';
+  const st = data.stats || {};
+  let panels = '';
+  if (mode === 'br') {
+    const parts = [['Solo', st.solostats], ['Duo', st.duostats], ['Squad', st.quadstats]];
+    let tabs = '', content = '';
+    parts.forEach(([label, obj], i) => {
+      if (!obj) return;
+      tabs += `<div class="tab ${i === 0 ? 'active' : ''}" data-p="p${i}">${label}</div>`;
+      content += `<div class="mode-panel ${i === 0 ? 'active' : ''}" id="p${i}">${statCard(obj, label)}</div>`;
+    });
+    panels = tabs ? `<div class="mode-tabs">${tabs}</div>${content}` : '<div class="empty">No BR stats found for this player.</div>';
+  } else {
+    panels = st.csstats ? `<div class="mode-panel active">${statCard(st.csstats, 'CS')}</div>` : '<div class="empty">No CS stats found for this player.</div>';
+  }
+  $('pl_stats').innerHTML = panels;
+  document.querySelectorAll('.mode-tabs .tab').forEach(t => t.onclick = () => {
+    document.querySelectorAll('.mode-tabs .tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.mode-panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    $(t.dataset.p).classList.add('active');
+  });
+};
+$('p_uid').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn_load').click(); });
+</script>
+{% endblock %}

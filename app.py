@@ -2,14 +2,26 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import json
 import os
+import sys
 import time
+import threading
+import subprocess
 from datetime import datetime, timedelta
 from Utilities.until import load_accounts, load_guest_accounts, load_usage_history, save_usage_history, save_guest_accounts
 from Api.Account import get_garena_token, get_major_login
 from Api.InGame import get_player_personal_show, get_player_stats, search_account_by_keyword, send_like
+from Additional import GenerateAccounts
 
 
 accounts = load_accounts()
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BOT_DIR = os.path.join(BASE_DIR, "LevelUpBot")
+CONFIG_DIR = os.path.join(BASE_DIR, "Configuration")
+BOT_CTRL_FILE = os.path.join(CONFIG_DIR, "BotControl.json")
+BOT_CTRL_RESULT_FILE = os.path.join(CONFIG_DIR, "BotControlResult.json")
+BOT_STATUS_FILE = os.path.join(CONFIG_DIR, "BotStatus.json")
+BOT_PID_FILE = os.path.join(BOT_DIR, "bot.pid")
 
 
 def normalize_server(name):
@@ -43,6 +55,30 @@ CORS(app)
 def root():
     display_servers = sorted({k.rstrip("0123456789") for k in accounts} | {k for k in load_guest_accounts()})
     return render_template('index.html', servers=display_servers)
+
+
+@app.route('/player', methods=['GET'])
+def player_page():
+    display_servers = sorted({k.rstrip("0123456789") for k in accounts} | {k for k in load_guest_accounts()})
+    return render_template('player.html', servers=display_servers)
+
+
+@app.route('/likes', methods=['GET'])
+def likes_page():
+    display_servers = sorted({k.rstrip("0123456789") for k in accounts} | {k for k in load_guest_accounts()})
+    return render_template('likes.html', servers=display_servers)
+
+
+@app.route('/guests', methods=['GET'])
+def guests_page():
+    display_servers = sorted({k.rstrip("0123456789") for k in accounts} | {k for k in load_guest_accounts()})
+    return render_template('guests.html', servers=display_servers)
+
+
+@app.route('/bot', methods=['GET'])
+def bot_page():
+    display_servers = sorted({k.rstrip("0123456789") for k in accounts} | {k for k in load_guest_accounts()})
+    return render_template('bot.html', servers=display_servers)
 
 
 @app.route('/health', methods=['GET'])
@@ -187,6 +223,173 @@ def api_guests_remove():
         return jsonify({"success": True, "removed": uid, "server": key, "total": len(bank[key])}), 200
     except Exception as e:
         return jsonify({"success": False, "error": f"Failed to remove guest: {str(e)}"}), 500
+
+
+@app.route('/api/guests/generate', methods=['POST'])
+def api_guests_generate():
+    try:
+        data = request.get_json(silent=True) or {}
+        server = str(data.get('server') or 'IND').upper().strip().rstrip("0123456789") or "IND"
+        try:
+            count = min(max(int(data.get('count') or 3), 1), 20)
+        except (TypeError, ValueError):
+            count = 3
+        result = {}
+
+        def run():
+            try:
+                made, _ = GenerateAccounts.generate_guests(server, count)
+                result['made'] = made
+                result['ok'] = True
+            except Exception as e:
+                result['ok'] = False
+                result['error'] = str(e)
+
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+        t.join(timeout=420)
+        if not result.get('ok'):
+            return jsonify({"success": False, "error": result.get('error', 'generation timed out')}), 500
+        made = result.get('made', [])
+        return jsonify({
+            "success": True,
+            "server": server,
+            "count": len(made),
+            "created": made,
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Failed to generate guests: {str(e)}"}), 500
+
+
+def bot_process_alive():
+    try:
+        with open(BOT_PID_FILE) as f:
+            pid = int(f.read().strip())
+        os.kill(pid, 0)
+        return True
+    except Exception:
+        return False
+
+
+def _read_json_file(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+@app.route('/api/likes/today', methods=['GET'])
+def api_likes_today():
+    try:
+        usage = load_usage_history()
+        today = datetime.now().strftime("%Y-%m-%d")
+        targets = {t: len(usage.get(t, {}).get(today, [])) for t in usage if usage.get(t, {}).get(today)}
+        return jsonify({
+            "success": True,
+            "date": today,
+            "targets_today": len(targets),
+            "likes_today": sum(targets.values()),
+            "per_target": targets,
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/bot/status', methods=['GET'])
+def api_bot_status():
+    status = _read_json_file(BOT_STATUS_FILE) or {}
+    status['process_alive'] = bot_process_alive()
+    status['running'] = bool(status.get('running') and status['process_alive'])
+    try:
+        if os.path.exists(os.path.join(BOT_DIR, "bot.log")):
+            with open(os.path.join(BOT_DIR, "bot.log"), "rb") as f:
+                f.seek(max(0, os.path.getsize(os.path.join(BOT_DIR, "bot.log")) - 6000))
+                status['log_tail'] = f.read().decode("utf-8", errors="replace")[-3000:]
+    except Exception:
+        pass
+    return jsonify(status), 200
+
+
+@app.route('/api/bot/start', methods=['POST'])
+def api_bot_start():
+    try:
+        data = request.get_json(silent=True) or {}
+        uid = str(data.get('uid') or '').strip()
+        password = str(data.get('password') or '').strip()
+        if not uid or not password:
+            return jsonify({"success": False, "error": "uid and password are required"}), 400
+        if bot_process_alive():
+            return jsonify({"success": False, "error": "Bot is already running — stop it first"}), 409
+        env = dict(os.environ)
+        env['GUEST_UID'] = uid
+        env['GUEST_PASSWORD'] = password
+        log_path = os.path.join(BOT_DIR, "bot.log")
+        with open(log_path, "a") as logf:
+            proc = subprocess.Popen(
+                [sys.executable, "-u", "app.py"],
+                cwd=BOT_DIR, env=env, stdout=logf, stderr=logf,
+                stdin=subprocess.DEVNULL, start_new_session=True,
+            )
+        with open(BOT_PID_FILE, "w") as f:
+            f.write(str(proc.pid))
+        return jsonify({"success": True, "pid": proc.pid, "uid": uid}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Failed to start bot: {str(e)}"}), 500
+
+
+@app.route('/api/bot/stop', methods=['POST'])
+def api_bot_stop():
+    graceful = False
+    killed = False
+    try:
+        cmd = {"id": f"stop-{int(time.time() * 1000)}", "action": "stop_bot",
+               "params": {}, "pending": True, "at": time.time()}
+        with open(BOT_CTRL_FILE, "w") as f:
+            json.dump(cmd, f, indent=2)
+        graceful = True
+    except Exception:
+        pass
+    try:
+        with open(BOT_PID_FILE) as f:
+            pid = int(f.read().strip())
+        os.kill(pid, 15)
+        killed = True
+    except Exception:
+        pass
+    try:
+        os.remove(BOT_PID_FILE)
+    except Exception:
+        pass
+    return jsonify({"success": True, "graceful": graceful, "killed": killed}), 200
+
+
+@app.route('/api/bot/command', methods=['POST'])
+def api_bot_command():
+    try:
+        data = request.get_json(silent=True) or {}
+        action = str(data.get('action') or '').strip()
+        params = data.get('params') or {}
+        if not action:
+            return jsonify({"success": False, "error": "action is required"}), 400
+        if not bot_process_alive():
+            return jsonify({"success": False, "error": "Bot is not running"}), 409
+        cid = f"cmd-{int(time.time() * 1000)}"
+        cmd = {"id": cid, "action": action, "params": params, "pending": True, "at": time.time()}
+        with open(BOT_CTRL_FILE, "w") as f:
+            json.dump(cmd, f, indent=2)
+        for _ in range(80):
+            time.sleep(0.5)
+            res = _read_json_file(BOT_CTRL_RESULT_FILE)
+            if res and res.get('id') == cid:
+                return jsonify({
+                    "success": res.get('status') == 'done',
+                    "action": action,
+                    "result": res.get('result', ''),
+                }), 200
+        return jsonify({"success": False, "error": "Timed out waiting for bot response", "action": action}), 504
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Bot command failed: {str(e)}"}), 500
 
 
 @app.route('/get_search_account_by_keyword', methods=['GET'])
@@ -596,6 +799,26 @@ def get_account_info():
 
 
 
+def fetch_liked_count(server, uid_int):
+    """Fetch the target's current 'liked' count via GetPlayerPersonalShow."""
+    try:
+        auth_key = normalize_server(server)
+        if not auth_key:
+            return None
+        auth_response = get_garena_token(accounts[auth_key]['uid'], accounts[auth_key]['password'])
+        if not auth_response or 'access_token' not in auth_response:
+            return None
+        login_response = get_major_login(auth_response["access_token"], auth_response["open_id"])
+        if not login_response or 'token' not in login_response:
+            return None
+        profile = get_player_personal_show(login_response["serverUrl"], login_response["token"], uid_int)
+        if not profile:
+            return None
+        return profile.get("basicinfo", {}).get("liked")
+    except Exception:
+        return None
+
+
 @app.route('/send_like', methods=['GET', 'POST'])
 def send_like_endpoint():
     try:
@@ -669,6 +892,15 @@ def send_like_endpoint():
             "total_likes_on_target_today": len(used_today),
             "guests_remaining_today": max(0, len(guests) - len(used_today)),
         }
+        liked_before = fetch_liked_count(server, uid_int)
+        if sent > 0:
+            time.sleep(4)
+        liked_after = fetch_liked_count(server, uid_int)
+        if liked_before is not None or liked_after is not None:
+            response["liked_before"] = liked_before
+            response["liked_after"] = liked_after
+            if liked_before is not None and liked_after is not None:
+                response["liked_increase"] = liked_after - liked_before
         if sent == 0 and failures:
             bot_result = send_like_via_bot_token(uid_int, server)
             if bot_result.get("ok"):
