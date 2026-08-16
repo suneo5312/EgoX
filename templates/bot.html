@@ -33,7 +33,7 @@
 
 <div class="card">
   <h2>Level-Up Loop (EXP farming)</h2>
-  <p class="empty" style="padding:4px 2px 12px">The loop joins <b id="l_team_now">no team</b> every cycle, spams the match start for 18s, stays in the match for the full duration, then re-joins and repeats. EXP is only awarded when a match actually completes, so the host player must start real matches.</p>
+  <p class="empty" style="padding:4px 2px 12px">Each cycle the bot joins <b id="l_team_now">no team</b>, presses <b>READY</b> (msg 5 — the server keeps accounts "not ready" until this is sent), spams the match start for 18s, stays in the match for the full duration, then re-joins and repeats. EXP is only awarded when a match actually completes, so the host player must start real matches.</p>
   <div class="row">
     <div class="field"><label>Team code</label>
       <div class="row" style="gap:8px"><input id="l_team" placeholder="e.g. 123456"><button id="l_set_team" class="ghost btn-sm">Set &amp; Farm</button><button id="l_clear_team" class="danger btn-sm">Clear</button></div>
@@ -56,7 +56,7 @@
       <div class="row" style="gap:8px"><input id="c_room_id" placeholder="room id"><input id="c_room_pw" placeholder="password (optional)" style="width:150px"><button id="c_join_room" class="ghost btn-sm">Join</button></div>
     </div>
     <div class="field"><label>Join Team (code)</label>
-      <div class="row" style="gap:8px"><input id="c_team" placeholder="team code"><button id="c_join_team" class="ghost btn-sm">Join</button></div>
+      <div class="row" style="gap:8px"><input id="c_team" placeholder="team code"><button id="c_join_team" class="ghost btn-sm">Join</button><button id="c_ready" class="ok btn-sm">Press Ready</button></div>
     </div>
     <div class="field"><label>Guild ID</label>
       <div class="row" style="gap:8px"><input id="c_guild" placeholder="guild id"><button id="c_join_guild" class="ghost btn-sm">Join Guild</button><button id="c_leave_guild" class="ghost btn-sm">Leave Guild</button></div>
@@ -214,6 +214,7 @@ $('c_loop_on').onclick = () => sendCommand('match_loop', { enabled: true });
 $('c_loop_off').onclick = () => sendCommand('match_loop', { enabled: false });
 $('c_match_now').onclick = () => sendCommand('start_match_now', {});
 $('c_leave_room').onclick = () => sendCommand('leave_room', {});
+$('c_ready').onclick = () => sendCommand('press_ready', {});
 
 $('l_set_team').onclick = async () => {
   const code = $('l_team').value.trim();

@@ -71,6 +71,7 @@ legendry_cycle_running = False
 reject_spam_running = False
 insquad = None
 joining_team = False
+SQUAD_OWNER = None
 reject_spam_task = None
 lag_running = False
 lag_task = None
@@ -782,6 +783,26 @@ async def join_teamcode_packet(team_code, key, iv, region):
         packet_type = "0515"
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), packet_type, key, iv)
 
+async def ready_squad_packet(owner_uid, bot_uid, key, iv, region):
+    """Msg 5 = squad ready / join-confirm. The server keeps the account
+    'not ready' in the squad lobby until this is sent after joining."""
+    fields = {
+        1: 5,
+        2: {
+            1: int(owner_uid),
+            2: 1,
+            3: int(bot_uid),
+            4: "",
+        },
+    }
+    if region.lower() == "ind":
+        packet_type = '0514'
+    elif region.lower() == "bd":
+        packet_type = "0519"
+    else:
+        packet_type = "0515"
+    return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), packet_type, key, iv)
+
 async def auto_start_loop(team_code, uid, chat_id, chat_type, key, iv, region):
     global auto_start_running, stop_auto
     while not stop_auto:
@@ -830,12 +851,12 @@ async def reset_bot_state(key, iv, region):
         return False
 
 
-async def random_match_loop(key, iv, region):
+async def random_match_loop(key, iv, region, bot_uid):
     """Level-up loop: joins the configured team (LEVEL_TEAM_CODE), spams the
     match start, stays in the match until it ends (MATCH_STAY_DURATION), then
     leaves and repeats. Without a team code the loop idles in waiting_team
     state (the server ignores solo matchmaking packets entirely)."""
-    global online_writer, whisper_writer, MATCH_LOOP_ENABLED, MATCH_CYCLES, LEVEL_TEAM_CODE, LEVEL_STATE
+    global online_writer, whisper_writer, MATCH_LOOP_ENABLED, MATCH_CYCLES, LEVEL_TEAM_CODE, LEVEL_STATE, SQUAD_OWNER
     while True:
         try:
             if not MATCH_LOOP_ENABLED:
@@ -856,6 +877,15 @@ async def random_match_loop(key, iv, region):
             await asyncio.sleep(3)
             if online_writer is None:
                 continue
+            LEVEL_STATE = "readying"
+            owner = SQUAD_OWNER or int(bot_uid)
+            ready_packet = await ready_squad_packet(owner, bot_uid, key, iv, region)
+            for _ in range(10):
+                if online_writer is None:
+                    break
+                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', ready_packet)
+                await asyncio.sleep(0.5)
+            await asyncio.sleep(2)
             LEVEL_STATE = "starting"
             start_packet = await start_auto_packet(key, iv, region)
             for _ in range(180):
@@ -904,7 +934,7 @@ async def dashboard_control_loop(key, iv, region, bot_uid):
     """Polls Configuration/BotControl.json for dashboard commands, executes them
     with the bot's own helpers, writes results to BotControlResult.json and
     heartbeats status into BotStatus.json."""
-    global MATCH_LOOP_ENABLED, MATCH_CYCLES, CURRENT_LEVEL, CURRENT_EXP, CURRENT_NICK, LEVEL_TEAM_CODE, LEVEL_STATE, MATCH_STAY_DURATION
+    global MATCH_LOOP_ENABLED, MATCH_CYCLES, CURRENT_LEVEL, CURRENT_EXP, CURRENT_NICK, LEVEL_TEAM_CODE, LEVEL_STATE, MATCH_STAY_DURATION, SQUAD_OWNER
     while True:
         try:
             cmd = _read_json(CTRL_FILE)
@@ -945,6 +975,13 @@ async def dashboard_control_loop(key, iv, region, bot_uid):
                             raise RuntimeError("failed to build team join packet")
                         await SEndPacKeT(whisper_writer, online_writer, 'OnLine', pkt)
                         res["result"] = f"Joined team {code}"
+                    elif action == "press_ready":
+                        if online_writer is None:
+                            raise RuntimeError("not online")
+                        owner = SQUAD_OWNER or int(bot_uid)
+                        rp = await ready_squad_packet(owner, int(bot_uid), key, iv, region)
+                        await SEndPacKeT(whisper_writer, online_writer, 'OnLine', rp)
+                        res["result"] = f"Ready packet sent (owner {owner})"
                     elif action == "join_guild":
                         gid = str(params.get("guild_id") or "")
                         if not gid:
@@ -1016,6 +1053,7 @@ async def dashboard_control_loop(key, iv, region, bot_uid):
                 "team_code": LEVEL_TEAM_CODE,
                 "level_state": LEVEL_STATE,
                 "match_duration": MATCH_STAY_DURATION,
+                "squad_owner": SQUAD_OWNER,
                 "uptime": int(time.time() - BOT_START_TIME),
                 "started_at": BOT_START_TIME,
                 "updated_at": time.time(),
@@ -2979,7 +3017,7 @@ def get_random_evo_emote():
     return int(random.choice([evo_emotes[str(i)] for i in range(1, 19)]))
 
 async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
-    global online_writer, whisper_writer, spammer_uid, spam_chat_id, spam_uid, XX, uid, Spy, data2, Chat_Leave, fast_spam_running, fast_spam_task, custom_spam_running, custom_spam_task, spam_request_running, spam_request_task, evo_fast_spam_running, evo_fast_spam_task, evo_custom_spam_running, evo_custom_spam_task, lag_running, lag_task, spm_inv_running, spm_inv_task, last_status_packet, status_response_cache, insquad, joining_team, whisper_writer, region, exploit_running, exploit_instance
+    global online_writer, whisper_writer, spammer_uid, spam_chat_id, spam_uid, XX, uid, Spy, data2, Chat_Leave, fast_spam_running, fast_spam_task, custom_spam_running, custom_spam_task, spam_request_running, spam_request_task, evo_fast_spam_running, evo_fast_spam_task, evo_custom_spam_running, evo_custom_spam_task, lag_running, lag_task, spm_inv_running, spm_inv_task, last_status_packet, status_response_cache, insquad, joining_team, whisper_writer, region, exploit_running, exploit_instance, SQUAD_OWNER
     bot_uid = 14572471551
     if insquad is not None:
         insquad = None
@@ -3074,6 +3112,7 @@ async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
                         packet = await DeCode_PackEt(data_hex[10:])
                         packet_json = json.loads(packet)
                         OwNer_UiD, CHaT_CoDe, SQuAD_CoDe = await GeTSQDaTa(packet_json)
+                        SQUAD_OWNER = OwNer_UiD
                         JoinCHaT = await AutH_Chat(3, OwNer_UiD, CHaT_CoDe, key, iv)
                         await SEndPacKeT(whisper_writer, online_writer, 'ChaT', JoinCHaT)
                     except Exception as e:
@@ -3083,6 +3122,7 @@ async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
                         packet = await DeCode_PackEt(data2.hex()[10:])
                         packet = json.loads(packet)
                         OwNer_UiD, CHaT_CoDe, SQuAD_CoDe = await GeTSQDaTa(packet)
+                        SQUAD_OWNER = OwNer_UiD
                         JoinCHaT = await AutH_Chat(3, OwNer_UiD, CHaT_CoDe, key, iv)
                         await SEndPacKeT(whisper_writer, online_writer, 'ChaT', JoinCHaT)
                         def kx_random_colour(): return "_"
@@ -4659,7 +4699,7 @@ async def MaiiiinE():
     task1 = asyncio.create_task(TcPChaT(ChaTiP, ChaTporT, AutHToKen, key, iv, LoGinDaTaUncRypTinG, ready_event, region))
     task2 = asyncio.create_task(TcPOnLine(OnLineiP, OnLineporT, key, iv, AutHToKen))
     task3 = asyncio.create_task(level_monitor(int(TarGeT), ToKen, UrL))
-    task4 = asyncio.create_task(random_match_loop(key, iv, region))
+    task4 = asyncio.create_task(random_match_loop(key, iv, region, int(TarGeT)))
     task5 = asyncio.create_task(dashboard_control_loop(key, iv, region, int(TarGeT)))
     print("🎮 Random match auto-joiner armed (BR/CS, runs continuously)")
 
