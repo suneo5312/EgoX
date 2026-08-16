@@ -369,7 +369,7 @@ $('btn_like').onclick = async () => {
   const { status, data } = await api(`/send_like?uid=${encodeURIComponent(uid)}&server=${srv}&count=${cnt}`);
   if (status === 200 && data.status === 'success') {
     showMsg($('l_msg'),
-      `✓ Sent ${data.likes_sent}/${data.requested} likes to ${data.uid}\nTotal likes on target: ${data.total_likes_on_target}\nGuests remaining: ${data.guests_remaining}` +
+      `✓ Sent ${data.likes_sent}/${data.requested} likes to ${data.uid}\nLikes on target today: ${data.total_likes_on_target_today}\nGuests remaining today: ${data.guests_remaining_today}` +
       (data.warnings && data.warnings.length ? `\nWarnings:\n${data.warnings.join('\n')}` : ''), 'ok');
   } else {
     showMsg($('l_msg'), `✗ ${(data && data.error) || 'Failed to send likes'}`, 'err');

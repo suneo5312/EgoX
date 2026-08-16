@@ -104,7 +104,7 @@ def api_guests():
             gl = guests if isinstance(guests, list) else [guests]
             arr = []
             for g in gl:
-                liked_count = sum(1 for t in usage.values() if str(g.get("uid")) in t.get("used", []))
+                liked_count = sum(1 for t in usage.values() for day in t.values() if str(g.get("uid")) in day)
                 arr.append({"uid": g.get("uid"), "password": g.get("password", ""), "likes_sent": liked_count})
             out[srv] = arr
         return jsonify({"success": True, "guests": out}), 200
@@ -628,11 +628,12 @@ def send_like_endpoint():
 
         usage = load_usage_history()
         target_key = str(uid_int)
-        used_set = set(usage.get(target_key, {}).get("used", []))
+        today = datetime.now().strftime("%Y-%m-%d")
+        used_today = set(usage.get(target_key, {}).get(today, []))
 
-        available = [g for g in guests if str(g["uid"]) not in used_set]
+        available = [g for g in guests if str(g["uid"]) not in used_today]
         if not available:
-            return jsonify({"status": "error", "error": "All guest accounts already liked this target", "code": "ALL_USED"}), 429
+            return jsonify({"status": "error", "error": "All guest accounts already liked this target today", "code": "ALL_USED"}), 429
 
         to_send = available[:count]
         sent = 0
@@ -648,13 +649,15 @@ def send_like_endpoint():
                     failures.append(f"login failed for {g['uid']}")
                     continue
                 send_like(login_response["serverUrl"], login_response["token"], uid_int, server)
-                used_set.add(str(g["uid"]))
+                used_today.add(str(g["uid"]))
                 sent += 1
             except Exception as e:
                 failures.append(f"{g['uid']}: {str(e)[:80]}")
                 break
 
-        usage[target_key] = {"used": sorted(used_set), "total": len(used_set)}
+        entry = usage.setdefault(target_key, {})
+        entry[today] = sorted(used_today)
+        usage[target_key] = entry
         save_usage_history(usage)
 
         response = {
@@ -663,15 +666,59 @@ def send_like_endpoint():
             "server": server,
             "likes_sent": sent,
             "requested": count,
-            "total_likes_on_target": len(used_set),
-            "guests_remaining": max(0, len(guests) - len(used_set)),
+            "total_likes_on_target_today": len(used_today),
+            "guests_remaining_today": max(0, len(guests) - len(used_today)),
         }
-        if failures:
+        if sent == 0 and failures:
+            bot_result = send_like_via_bot_token(uid_int, server)
+            if bot_result.get("ok"):
+                response["status"] = "success"
+                response["likes_sent"] = 1
+                response["bot_fallback"] = True
+            else:
+                response["warnings"] = failures + [f"bot fallback: {bot_result.get('error', 'failed')}"]
+        elif failures:
             response["warnings"] = failures
         return jsonify(response), 200
 
     except Exception as e:
         return jsonify({"status": "error", "error": "Internal Server Error", "code": "INTERNAL_SERVER_ERROR"}), 500
+
+
+def send_like_via_bot_token(target_uid, server):
+    """Fallback: send 1 like using the LevelUpBot's saved JWT (LikeProfile)."""
+    try:
+        import os
+        from pathlib import Path
+        token_path = Path(__file__).parent / "LevelUpBot" / "token.json"
+        if not token_path.exists():
+            return {"ok": False, "error": "no bot token.json"}
+        with open(token_path) as f:
+            tok = json.load(f)
+        jwt_token = tok.get("token")
+        if not jwt_token:
+            return {"ok": False, "error": "empty bot token"}
+        region = str(tok.get("region") or server or "IND").upper()
+        domain = {
+            "IND": "client.ind.freefiremobile.com",
+            "BD": "client.bd.freefiremobile.com",
+            "TH": "client.th.freefiremobile.com",
+            "ID": "client.id.freefiremobile.com",
+            "VN": "client.vn.freefiremobile.com",
+            "SG": "client.sg.freefiremobile.com",
+            "MY": "client.my.freefiremobile.com",
+            "BR": "client.br.freefiremobile.com",
+            "US": "client.us.freefiremobile.com",
+            "RU": "client.ru.freefiremobile.com",
+            "ME": "client.me.freefiremobile.com",
+            "PK": "client.pk.freefiremobile.com",
+        }.get(region, "client.ind.freefiremobile.com")
+        server_url = f"https://{domain}"
+        from Api.InGame import send_like
+        send_like(server_url, jwt_token, int(target_uid), region)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:100]}
 
 
 if __name__ == '__main__':

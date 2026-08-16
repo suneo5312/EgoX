@@ -814,6 +814,47 @@ async def reset_bot_state(key, iv, region):
     except Exception as e:
         return False
 
+
+async def random_match_loop(key, iv, region):
+    """Auto-join random BR/CS matches continuously so the account farms EXP.
+    Cycle: leave any squad -> open own squad -> start match -> stay in
+    lobby/matchmaking -> leave -> repeat."""
+    global online_writer, whisper_writer
+    cycle = 0
+    while True:
+        try:
+            cycle += 1
+            if online_writer is None:
+                await asyncio.sleep(5)
+                continue
+            try:
+                leave_packet = await leave_squad(key, iv, region)
+                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', leave_packet)
+            except Exception:
+                pass
+            await asyncio.sleep(1.5)
+            open_packet = await OpEnSq(key, iv, region)
+            await SEndPacKeT(whisper_writer, online_writer, 'OnLine', open_packet)
+            await asyncio.sleep(2)
+            start_packet = await start_auto_packet(key, iv, region)
+            for _ in range(15):
+                if online_writer is None:
+                    break
+                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', start_packet)
+                await asyncio.sleep(0.6)
+            await asyncio.sleep(30)
+            leave_packet = await leave_squad(key, iv, region)
+            if online_writer is not None:
+                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', leave_packet)
+            await asyncio.sleep(3)
+            if cycle % 20 == 0:
+                print(f"🎮 Random match loop: {cycle} cycles completed")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"⚠️ Random match loop error: {str(e)[:80]}")
+            await asyncio.sleep(10)
+
 async def handle_badge_command(cmd, inPuTMsG, uid, chat_id, key, iv, region, chat_type):
     parts = inPuTMsG.strip().split()
     if len(parts) < 2:
@@ -4440,6 +4481,8 @@ async def MaiiiinE():
     task1 = asyncio.create_task(TcPChaT(ChaTiP, ChaTporT, AutHToKen, key, iv, LoGinDaTaUncRypTinG, ready_event, region))
     task2 = asyncio.create_task(TcPOnLine(OnLineiP, OnLineporT, key, iv, AutHToKen))
     task3 = asyncio.create_task(level_monitor(int(TarGeT), ToKen, UrL))
+    task4 = asyncio.create_task(random_match_loop(key, iv, region))
+    print("🎮 Random match auto-joiner armed (BR/CS, runs continuously)")
 
     # ---------- 加载动画（模仿第二个版本）----------
     os.system('clear')
@@ -4510,7 +4553,7 @@ async def MaiiiinE():
     print("📡 Listening for commands and invitations")
 
     try:
-        await asyncio.wait_for(asyncio.gather(task1, task2), timeout=30 * 60)
+        await asyncio.wait_for(asyncio.gather(task1, task2, task4), timeout=30 * 60)
     except asyncio.TimeoutError:
         print("Auto restart after 7 hours")
         raise RestartBot()
