@@ -1,0 +1,164 @@
+📁 Loading credentials...
+✅ Using account UID: 6699482175 (env GUEST_UID/GUEST_PASSWORD override, default hardcoded)
+✅ Native like system armed (LikeProfile)
+✅ Token saved to token.json
+📝 Token info: Region=IND, UID=6699482175
+[H[2J[3J==================================================
+🤖 NAJMI FF EXPERIMENT BOT - INITIALIZING
+==================================================
+🔄 Starting TCP Connections...
+📡 Connecting to Free Fire servers...
+🌐 Server connection established
+🔐 Authentication successful
+👤 Account UID: 17114338249
+🌍 Region: IND
+🔑 Token: eyJhbGciOiJIUzI1NiIsInN2ciI6Ij...
+📡 Online Server: 34.124.236.222:39698
+💬 Chat Server: 34.21.242.242:39800
+👋 Welcome, 0xMe⁴¹²⁶!
+
+🚀 Starting bot services...
+🎮 Random match auto-joiner armed (BR/CS, runs continuously)
+[H[2J[3J🤖 NAJMI FF EXPERIMENT  BOT - STARTING
+==================================================
+🔄 Loading.
+🔄 Loading..
+🔄 Loading...
+[H[2J[3J🤖 NAJMI FF EXPERIMENT  BOT - CONNECTING
+==================================================
+┌────────────────────────────────────┐
+│ ██████████████████████████████████ │
+└────────────────────────────────────┘
+
+⏳ Waiting for chat connection...
+🟢 ONLINE socket reconnected to 34.124.236.222:39698
+✅ Chat connection established!
+[H[2J[3J
+
+                      [37m███████[39m[32m╗[39m [37m████████[39m[32m╗[39m  [37m█████[39m[32m╗[39m  [37m██████[39m[32m╗ [39m 
+                      [37m██[39m[32m╔════╝[39m [32m╚══[39m[37m██[39m[32m╔══╝[39m [37m██[39m[32m╔══[39m[37m██[39m[32m╗[39m [37m██[39m[32m╔══[39m[37m██[39m[32m╗[39m 
+                      [37m███████[39m[32m╗[39m [37m   ██[39m[32m║   [39m [37m███████[39m[32m║[39m [37m██████[39m[32m╔╝[39m 
+                      [32m╚════[39m[37m██[39m[32m║[39m [37m   ██[39m[32m║   [39m [37m██[39m[32m╔══[39m[37m██[39m[32m║[39m [37m██[39m[32m╔══[39m[37m██[39m[32m╗[39m 
+                      [37m███████[39m[32m║[39m [37m   ██[39m[32m║   [39m [37m██[39m[32m║[39m[37m  ██[39m[32m║[39m [37m██[39m[32m║[39m[37m  ██[39m[32m║[39m 
+                      [32m╚══════╝[39m [32m   ╚═╝   [39m [32m╚═╝  ╚═╝[39m [32m╚═╝  ╚═╝[39m 
+
+
+
+🤖 NAJMI FF EXPERIMENT  BOT - ONLINE
+==================================================
+🔹 UID: 17114338249
+🔹 Name: 0xMe⁴¹²⁶
+🔹 Region: IND
+🔹 Status: 🟢 READY
+🔹 Chat Server: 34.21.242.242:39800
+🔹 Online Server: 34.124.236.222:39698
+==================================================
+💡 Commands available in squad/guild chat
+💡 Type /help for command list
+==================================================
+
+📊 System Check:
+📁 Working directory: /workspaces/EgoX/LevelUpBot
+✅ Cache file write test: PASSED
+✅ token.json file exists
+✅ Token age: 1.6 seconds
+
+🎯 Bot is now running...
+📡 Listening for commands and invitations
+📊 Current level: 2
+👤 Account name: 0xMe⁴¹²⁶
+📈 EXP: 48
+🔌 ONLINE connection dropped — reconnecting...
+🟢 ONLINE socket reconnected to 34.124.236.222:39698
+🔌 ONLINE connection dropped — reconnecting...
+🟢 ONLINE socket reconnected to 34.124.236.222:39698
+🔌 ONLINE connection dropped — reconnecting...
+🟢 ONLINE socket reconnected to 34.124.236.222:39698
+🔌 ONLINE connection dropped — reconnecting...
+🟢 ONLINE socket reconnected to 34.124.236.222:39698
+🔌 ONLINE connection dropped — reconnecting...
+🟢 ONLINE socket reconnected to 34.124.236.222:39698
+🔌 ONLINE connection dropped — reconnecting...
+🟢 ONLINE socket reconnected to 34.124.236.222:39698
+🔌 ONLINE connection dropped — reconnecting...
+🟢 ONLINE socket reconnected to 34.124.236.222:39698
+🔌 ONLINE connection dropped — reconnecting...
+🟢 ONLINE socket reconnected to 34.124.236.222:39698
+🔌 ONLINE connection dropped — reconnecting...
+🟢 ONLINE socket reconnected to 34.124.236.222:39698
+Auto restart after 7 hours
+⚠️ Login attempt failed: NameError: name 'RestartBot' is not defined — retrying in 60s
+📁 Loading credentials...
+✅ Using account UID: 6699482175 (env GUEST_UID/GUEST_PASSWORD override, default hardcoded)
+✅ Native like system armed (LikeProfile)
+✅ Token saved to token.json
+📝 Token info: Region=IND, UID=6699482175
+[H[2J[3J==================================================
+🤖 NAJMI FF EXPERIMENT BOT - INITIALIZING
+==================================================
+🔄 Starting TCP Connections...
+📡 Connecting to Free Fire servers...
+🌐 Server connection established
+🔐 Authentication successful
+👤 Account UID: 17114338249
+🌍 Region: IND
+🔑 Token: eyJhbGciOiJIUzI1NiIsInN2ciI6Ij...
+📡 Online Server: 34.124.236.222:39698
+💬 Chat Server: 34.21.242.242:39800
+👋 Welcome, 0xMe⁴¹²⁶!
+
+🚀 Starting bot services...
+🎮 Random match auto-joiner armed (BR/CS, runs continuously)
+[H[2J[3J🤖 NAJMI FF EXPERIMENT  BOT - STARTING
+==================================================
+🔄 Loading.
+🔄 Loading..
+🔄 Loading...
+[H[2J[3J🤖 NAJMI FF EXPERIMENT  BOT - CONNECTING
+==================================================
+┌────────────────────────────────────┐
+│ ██████████████████████████████████ │
+└────────────────────────────────────┘
+
+⏳ Waiting for chat connection...
+✅ Chat connection established!
+[H[2J[3J
+
+                      [37m███████[39m[32m╗[39m [37m████████[39m[32m╗[39m  [37m█████[39m[32m╗[39m  [37m██████[39m[32m╗ [39m 
+                      [37m██[39m[32m╔════╝[39m [32m╚══[39m[37m██[39m[32m╔══╝[39m [37m██[39m[32m╔══[39m[37m██[39m[32m╗[39m [37m██[39m[32m╔══[39m[37m██[39m[32m╗[39m 
+                      [37m███████[39m[32m╗[39m [37m   ██[39m[32m║   [39m [37m███████[39m[32m║[39m [37m██████[39m[32m╔╝[39m 
+                      [32m╚════[39m[37m██[39m[32m║[39m [37m   ██[39m[32m║   [39m [37m██[39m[32m╔══[39m[37m██[39m[32m║[39m [37m██[39m[32m╔══[39m[37m██[39m[32m╗[39m 
+                      [37m███████[39m[32m║[39m [37m   ██[39m[32m║   [39m [37m██[39m[32m║[39m[37m  ██[39m[32m║[39m [37m██[39m[32m║[39m[37m  ██[39m[32m║[39m 
+                      [32m╚══════╝[39m [32m   ╚═╝   [39m [32m╚═╝  ╚═╝[39m [32m╚═╝  ╚═╝[39m 
+
+
+
+🤖 NAJMI FF EXPERIMENT  BOT - ONLINE
+==================================================
+🔹 UID: 17114338249
+🔹 Name: 0xMe⁴¹²⁶
+🔹 Region: IND
+🔹 Status: 🟢 READY
+🔹 Chat Server: 34.21.242.242:39800
+🔹 Online Server: 34.124.236.222:39698
+==================================================
+💡 Commands available in squad/guild chat
+💡 Type /help for command list
+==================================================
+
+📊 System Check:
+📁 Working directory: /workspaces/EgoX/LevelUpBot
+✅ Cache file write test: PASSED
+✅ token.json file exists
+✅ Token age: 1.6 seconds
+
+🎯 Bot is now running...
+📡 Listening for commands and invitations
+🟢 ONLINE socket reconnected to 34.124.236.222:39698
+📊 Current level: 2
+👤 Account name: 0xMe⁴¹²⁶
+📈 EXP: 48
+🔌 ONLINE connection dropped — reconnecting...
+🟢 ONLINE socket reconnected to 34.124.236.222:39698
+🔌 ONLINE connection dropped — reconnecting...
+🟢 ONLINE socket reconnected to 34.124.236.222:39698

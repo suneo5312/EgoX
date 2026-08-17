@@ -1,0 +1,73 @@
+📁 Loading credentials...
+✅ Using account UID: 6603148404 (env GUEST_UID/GUEST_PASSWORD override, default hardcoded)
+✅ Native like system armed (LikeProfile)
+✅ Token saved to token.json
+📝 Token info: Region=IND, UID=6603148404
+[H[2J[3J==================================================
+🤖 NAJMI FF EXPERIMENT BOT - INITIALIZING
+==================================================
+🔄 Starting TCP Connections...
+📡 Connecting to Free Fire servers...
+🌐 Server connection established
+🔐 Authentication successful
+👤 Account UID: 17051430569
+🌍 Region: IND
+🔑 Token: eyJhbGciOiJIUzI1NiIsInN2ciI6Ij...
+📡 Online Server: 34.177.96.120:39698
+💬 Chat Server: 34.126.128.188:39800
+👋 Welcome, NO723b601541!
+
+🚀 Starting bot services...
+🎮 Random match auto-joiner armed (BR/CS, runs continuously)
+[H[2J[3J🤖 NAJMI FF EXPERIMENT  BOT - STARTING
+==================================================
+🔄 Loading.
+🔄 Loading..
+🔄 Loading...
+[H[2J[3J🤖 NAJMI FF EXPERIMENT  BOT - CONNECTING
+==================================================
+┌────────────────────────────────────┐
+│ ██████████████████████████████████ │
+└────────────────────────────────────┘
+
+⏳ Waiting for chat connection...
+🟢 ONLINE socket reconnected to 34.177.96.120:39698
+✅ Chat connection established!
+[H[2J[3J
+
+                                                                                             [37m███████[39m[32m╗[39m [37m████████[39m[32m╗[39m  [37m█████[39m[32m╗[39m  [37m██████[39m[32m╗ [39m 
+                                                                                             [37m██[39m[32m╔════╝[39m [32m╚══[39m[37m██[39m[32m╔══╝[39m [37m██[39m[32m╔══[39m[37m██[39m[32m╗[39m [37m██[39m[32m╔══[39m[37m██[39m[32m╗[39m 
+                                                                                             [37m███████[39m[32m╗[39m [37m   ██[39m[32m║   [39m [37m███████[39m[32m║[39m [37m██████[39m[32m╔╝[39m 
+                                                                                             [32m╚════[39m[37m██[39m[32m║[39m [37m   ██[39m[32m║   [39m [37m██[39m[32m╔══[39m[37m██[39m[32m║[39m [37m██[39m[32m╔══[39m[37m██[39m[32m╗[39m 
+                                                                                             [37m███████[39m[32m║[39m [37m   ██[39m[32m║   [39m [37m██[39m[32m║[39m[37m  ██[39m[32m║[39m [37m██[39m[32m║[39m[37m  ██[39m[32m║[39m 
+                                                                                             [32m╚══════╝[39m [32m   ╚═╝   [39m [32m╚═╝  ╚═╝[39m [32m╚═╝  ╚═╝[39m 
+
+
+
+🤖 NAJMI FF EXPERIMENT  BOT - ONLINE
+==================================================
+🔹 UID: 17051430569
+🔹 Name: NO723b601541
+🔹 Region: IND
+🔹 Status: 🟢 READY
+🔹 Chat Server: 34.126.128.188:39800
+🔹 Online Server: 34.177.96.120:39698
+==================================================
+💡 Commands available in squad/guild chat
+💡 Type /help for command list
+==================================================
+
+📊 System Check:
+📁 Working directory: /workspaces/EgoX/LevelUpBot
+✅ Cache file write test: PASSED
+✅ token.json file exists
+✅ Token age: 1.5 seconds
+
+🎯 Bot is now running...
+📡 Listening for commands and invitations
+📊 Current level: 2
+👤 Account name: NO723b601541
+📈 EXP: 48
+[PKT] type=6 len=1496 {"1": {"wire_type": "varint", "data": 17051430569}, "2": {"wire_type": "varint", "data": 5}, "4": {"wire_type": "varint", "data": 6}, "5": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 10502299434}, "2": {"wire_type": "string", "data": "IND"}, "3": {"wire_type": "varint", "data": 1}, "4": {"wire_type": "varint", "data": 3}, "6": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 17051430569}, "2": {"wire_type": "string", "data": "NO723b601541"}, "3": {"wire_type": "string", "data": "IND"}, "4": {"wire_type": "varint", "data": 1786961838}, "5": {"wire_type": "varint", "data": 2}, "6": {"wire_type": "varint", "data": 102000007}, "7": {"wire_type": "varint", "data": 50}, "8": {"wire_type": "length_delimited", "data": {"25375000": {"wire_type": "varint", "data": 205000000}, "26000000": {"wire_type": "varint", "data": 214000000}, "25500000": {"wire_type": "varint", "data": 211000000}}}, "9": {"wire_type": "varint", "data": 1}, "10": {"wire_type": "varint", "data": 301}, "11": {"wire_type": "varint", "data": 1000}, "18": {"wire_type": "length_delimited", "data": {}}, "19": {"wire_type": "varint", "data": 301}, "24": {"wire_type": "varint", "data": 1}, "25": {"wire_type": "varint", "data": 1}, "29": {"wire_type": "varint", "data": 1}, "33": {"wire_type": "varint", "data": 4}, "34": {"wire_type": "length_delimited", "data": {}}, "37": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 89}, "2": {"wire_type": "varint", "data": 6500}}}, "40": {"wire_type": "length_delimited", "data": {"2": {"wire_type": "length_delimited", "data": {"3": {"wire_type": "length_delimited", "data": {}}}}, "3": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 81}, "2": {"wire_type": "string", "data": "ef"}}}, "4": {"wire_type": "string", "data": ""}}}, "45": {"wire_type": "length_delimited", "data": {"2": {"wire_type": "varint", "data": 1}, "3": {"wire_type": "varint", "data": 1}}}, "49": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 1}}}, "50": {"wire_type": "string", "data": ""}, "61": {"wire_type": "string", "data": ""}, "62": {"wire_type": "string", "data": ""}, "64": {"wire_type": "varint", "data": 100}, "66": {"wire_type": "varint", "data": 2}, "67": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 1786961839}, "4": {"wire_type": "varint", "data": 1}, "8": {"wire_type": "varint", "data": 1}}}, "69": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 15}, "3": {"wire_type": "fixed32"}}}, "71": {"wire_type": "string", "data": ""}, "73": {"wire_type": "string", "data": ""}, "75": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 17051430569}}}, "78": {"wire_type": "varint", "data": 10}}}, "7": {"wire_type": "length_delimited", "data": {}}, "8": {"wire_type": "varint", "data": 1}, "10": {"wire_type": "varint", "data": 1}, "11": {"wire_type": "string", "data": "6160626"}, "13": {"wire_type": "varint", "data": 1}, "14": {"wire_type": "string", "data": "1786961358986077853_3u8jnwicvc"}, "17": {"wire_type": "varint", "data": 2089293486296913920}, "20": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "length_delimited", "data": {}}, "2": {"wire_type": "varint", "data": 908027003}}}, "22": {"wire_type": "varint", "data": 329}, "29": {"wire_type": "string", "data": "IDC2"}, "31": {"wire_type": "string", "data": "1786961358986080062_jsmdwh545p"}, "33": {"wire_type": "string", "data": "1786961358986081671_3a61b97cbp"}}}}
+[PKT] type=10 len=1501 {"1": {"wire_type": "varint", "data": 17051430569}, "2": {"wire_type": "varint", "data": 5}, "4": {"wire_type": "varint", "data": 10}, "5": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 10502299434}, "2": {"wire_type": "string", "data": "IND"}, "3": {"wire_type": "varint", "data": 1}, "4": {"wire_type": "varint", "data": 3}, "6": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 17051430569}, "2": {"wire_type": "string", "data": "NO723b601541"}, "3": {"wire_type": "string", "data": "IND"}, "4": {"wire_type": "varint", "data": 1786961838}, "5": {"wire_type": "varint", "data": 2}, "6": {"wire_type": "varint", "data": 102000007}, "7": {"wire_type": "varint", "data": 50}, "8": {"wire_type": "length_delimited", "data": {"25375000": {"wire_type": "varint", "data": 205000000}, "26000000": {"wire_type": "varint", "data": 214000000}, "25500000": {"wire_type": "varint", "data": 211000000}}}, "9": {"wire_type": "varint", "data": 1}, "10": {"wire_type": "varint", "data": 301}, "11": {"wire_type": "varint", "data": 1000}, "18": {"wire_type": "length_delimited", "data": {}}, "19": {"wire_type": "varint", "data": 301}, "24": {"wire_type": "varint", "data": 1}, "25": {"wire_type": "varint", "data": 1}, "29": {"wire_type": "varint", "data": 1}, "33": {"wire_type": "varint", "data": 4}, "34": {"wire_type": "length_delimited", "data": {}}, "37": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 89}, "2": {"wire_type": "varint", "data": 6500}}}, "40": {"wire_type": "length_delimited", "data": {"2": {"wire_type": "length_delimited", "data": {"3": {"wire_type": "length_delimited", "data": {}}}}, "3": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 81}, "2": {"wire_type": "string", "data": "ef"}}}, "4": {"wire_type": "string", "data": ""}}}, "45": {"wire_type": "length_delimited", "data": {"2": {"wire_type": "varint", "data": 1}, "3": {"wire_type": "varint", "data": 1}}}, "49": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 1}}}, "50": {"wire_type": "string", "data": ""}, "61": {"wire_type": "string", "data": ""}, "62": {"wire_type": "string", "data": ""}, "64": {"wire_type": "varint", "data": 100}, "66": {"wire_type": "varint", "data": 2}, "67": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 1786961839}, "4": {"wire_type": "varint", "data": 1}, "8": {"wire_type": "varint", "data": 1}}}, "69": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 15}, "3": {"wire_type": "fixed32"}}}, "71": {"wire_type": "string", "data": ""}, "73": {"wire_type": "string", "data": ""}, "75": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 17051430569}}}, "78": {"wire_type": "varint", "data": 10}}}, "7": {"wire_type": "length_delimited", "data": {}}, "8": {"wire_type": "varint", "data": 1}, "10": {"wire_type": "varint", "data": 1}, "11": {"wire_type": "string", "data": "6160626"}, "13": {"wire_type": "varint", "data": 1}, "14": {"wire_type": "string", "data": "1786961358986077853_3u8jnwicvc"}, "17": {"wire_type": "varint", "data": 2089293486296913920}, "20": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "length_delimited", "data": {}}, "2": {"wire_type": "varint", "data": 908027003}}}, "22": {"wire_type": "varint", "data": 329}, "29": {"wire_type": "string", "data": "IDC2"}, "31": {"wire_type": "string", "data": "1786961358986080062_jsmdwh545p"}, "33": {"wire_type": "string", "data": "1786961358986081671_3a61b97cbp"}}}, "2": {"wire_type": "varint", "data": 8}}}}
+[PKT] type=10 len=1508 {"1": {"wire_type": "varint", "data": 17051430569}, "2": {"wire_type": "varint", "data": 5}, "4": {"wire_type": "varint", "data": 10}, "5": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 10502299434}, "2": {"wire_type": "string", "data": "IND"}, "3": {"wire_type": "varint", "data": 1}, "4": {"wire_type": "varint", "data": 3}, "6": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 17051430569}, "2": {"wire_type": "string", "data": "NO723b601541"}, "3": {"wire_type": "string", "data": "IND"}, "4": {"wire_type": "varint", "data": 1786961838}, "5": {"wire_type": "varint", "data": 2}, "6": {"wire_type": "varint", "data": 102000007}, "7": {"wire_type": "varint", "data": 50}, "8": {"wire_type": "length_delimited", "data": {"25375000": {"wire_type": "varint", "data": 205000000}, "26000000": {"wire_type": "varint", "data": 214000000}, "25500000": {"wire_type": "varint", "data": 211000000}}}, "10": {"wire_type": "varint", "data": 301}, "11": {"wire_type": "varint", "data": 1000}, "18": {"wire_type": "length_delimited", "data": {}}, "19": {"wire_type": "varint", "data": 301}, "24": {"wire_type": "varint", "data": 1}, "25": {"wire_type": "varint", "data": 1}, "29": {"wire_type": "varint", "data": 1}, "33": {"wire_type": "varint", "data": 4}, "34": {"wire_type": "length_delimited", "data": {}}, "37": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 89}, "2": {"wire_type": "varint", "data": 6500}}}, "40": {"wire_type": "length_delimited", "data": {"2": {"wire_type": "length_delimited", "data": {"3": {"wire_type": "length_delimited", "data": {}}}}, "3": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 81}, "2": {"wire_type": "string", "data": "ef"}}}, "4": {"wire_type": "string", "data": ""}}}, "45": {"wire_type": "length_delimited", "data": {"2": {"wire_type": "varint", "data": 1}, "3": {"wire_type": "varint", "data": 1}}}, "49": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 1}}}, "50": {"wire_type": "string", "data": ""}, "59": {"wire_type": "varint", "data": 1}, "61": {"wire_type": "string", "data": ""}, "62": {"wire_type": "string", "data": ""}, "64": {"wire_type": "varint", "data": 100}, "66": {"wire_type": "varint", "data": 2}, "67": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 1786961839}, "4": {"wire_type": "varint", "data": 1}, "8": {"wire_type": "varint", "data": 1}}}, "69": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 15}, "3": {"wire_type": "fixed32"}}}, "71": {"wire_type": "string", "data": ""}, "73": {"wire_type": "string", "data": ""}, "75": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "varint", "data": 17051430569}}}, "78": {"wire_type": "varint", "data": 10}}}, "7": {"wire_type": "length_delimited", "data": {}}, "8": {"wire_type": "varint", "data": 1}, "10": {"wire_type": "varint", "data": 1}, "11": {"wire_type": "string", "data": "6160626"}, "13": {"wire_type": "varint", "data": 1}, "14": {"wire_type": "string", "data": "1786961358986077853_3u8jnwicvc"}, "17": {"wire_type": "varint", "data": 2089293486296913920}, "20": {"wire_type": "length_delimited", "data": {"1": {"wire_type": "length_delimited", "data": {}}, "2": {"wire_type": "varint", "data": 908027003}}}, "22": {"wire_type": "varint", "data": 329}, "25": {"wire_type": "varint", "data": 1}, "29": {"wire_type": "string", "data": "IDC2"}, "31": {"wire_type": "string", "data": "1786961358986080062_jsmdwh545p"}, "33": {"wire_type": "string", "data": "1786961358986081671_3a61b97cbp"}}}, "2": {"wire_type": "varint", "data": 8}}}}

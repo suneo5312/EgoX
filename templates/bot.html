@@ -4,7 +4,7 @@
 <div class="page-head">
   <h1>Level Up Bot Console</h1>
   <p>Run any guest account 24/7 in the background, monitor level-ups live, and answer dashboard commands.</p>
-  <div class="hint">EXP farming needs a <b>team code</b>: the game server ignores solo matchmaking packets (verified), so the bot joins a real player's squad via team code, spams match start, and stays in the match until it ends — then repeats. Set the team code below before the loop can farm.</div>
+  <div class="hint">EXP farming needs a <b>team code</b>: the game server ignores solo matchmaking packets (verified), so the bot joins a real player's squad via team code, <b>waits for the server to confirm the join</b>, then presses READY, starts the match, and stays in it until it ends — then repeats. Set the team code below before the loop can farm.</div>
 </div>
 
 <div class="grid2">
@@ -33,7 +33,7 @@
 
 <div class="card">
   <h2>Level-Up Loop (EXP farming)</h2>
-  <p class="empty" style="padding:4px 2px 12px">Each cycle the bot joins <b id="l_team_now">no team</b>, presses <b>READY</b> (msg 5 — the server keeps accounts "not ready" until this is sent), spams the match start for 18s, stays in the match for the full duration, then re-joins and repeats. EXP is only awarded when a match actually completes, so the host player must start real matches.</p>
+  <p class="empty" style="padding:4px 2px 12px">Each cycle the bot joins <b id="l_team_now">no team</b>, waits until the server confirms the join (re-sending the join packet if needed), presses <b>READY</b> (msg 5 — the server keeps accounts "not ready" until this is sent), spams the match start for 18s, stays in the match for the full duration, then re-joins and repeats. EXP is only awarded when a match actually completes, so the host player must start real matches.</p>
   <div class="row">
     <div class="field"><label>Team code</label>
       <div class="row" style="gap:8px"><input id="l_team" placeholder="e.g. 123456"><button id="l_set_team" class="ghost btn-sm">Set &amp; Farm</button><button id="l_clear_team" class="danger btn-sm">Clear</button></div>

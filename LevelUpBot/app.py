@@ -71,6 +71,7 @@ legendry_cycle_running = False
 reject_spam_running = False
 insquad = None
 joining_team = False
+join_confirmed = False
 SQUAD_OWNER = None
 reject_spam_task = None
 lag_running = False
@@ -804,14 +805,27 @@ async def ready_squad_packet(owner_uid, bot_uid, key, iv, region):
     return await GeneRaTePk((await CrEaTe_ProTo(fields)).hex(), packet_type, key, iv)
 
 async def auto_start_loop(team_code, uid, chat_id, chat_type, key, iv, region):
-    global auto_start_running, stop_auto
+    global auto_start_running, stop_auto, join_confirmed
     while not stop_auto:
         try:
             status_msg = f"[B][C][FFA500]🤖 Auto Start Bot\n🎯 Team: {team_code}\n⚡ Joining team..."
             await dl_send_message(chat_type, status_msg, uid, chat_id, key, iv)
-            join_packet = await join_teamcode_packet(team_code, key, iv, region)
-            await SEndPacKeT(whisper_writer, online_writer, 'OnLine', join_packet)
-            await asyncio.sleep(2)
+            join_confirmed = False
+            retries = 0
+            while not join_confirmed and not stop_auto:
+                join_packet = await join_teamcode_packet(team_code, key, iv, region)
+                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', join_packet)
+                retries += 1
+                wait_retry = 0
+                while wait_retry < 8 and not join_confirmed and not stop_auto:
+                    await asyncio.sleep(1)
+                    wait_retry += 1
+                if retries >= 30 and not join_confirmed:
+                    not_joined_msg = f"[B][C][FF0000]⏳ Team {team_code} not accepting joins (match in progress?). Waiting and retrying..."
+                    await dl_send_message(chat_type, not_joined_msg, uid, chat_id, key, iv)
+                    retries = 0
+            if stop_auto:
+                break
             start_msg = f"[B][C][00FF00]✅ Joined team {team_code}\n🎯 Starting match for {start_spam_duration} seconds..."
             await dl_send_message(chat_type, start_msg, uid, chat_id, key, iv)
             start_packet = await start_auto_packet(key, iv, region)
@@ -821,7 +835,7 @@ async def auto_start_loop(team_code, uid, chat_id, chat_type, key, iv, region):
                 await asyncio.sleep(start_spam_delay)
             if stop_auto:
                 break
-            wait_msg = f"[B][C][FFFF00]⏳ Match started! Bot in lobby waiting {wait_after_match} seconds..."
+            wait_msg = f"[B][C][FFFF00]⏳ Match started! Bot staying in match {wait_after_match} seconds..."
             await dl_send_message(chat_type, wait_msg, uid, chat_id, key, iv)
             waited = 0
             while waited < wait_after_match and not stop_auto:
@@ -852,11 +866,12 @@ async def reset_bot_state(key, iv, region):
 
 
 async def random_match_loop(key, iv, region, bot_uid):
-    """Level-up loop: joins the configured team (LEVEL_TEAM_CODE), spams the
-    match start, stays in the match until it ends (MATCH_STAY_DURATION), then
-    leaves and repeats. Without a team code the loop idles in waiting_team
+    """Level-up loop: joins the configured team (LEVEL_TEAM_CODE), waits for the
+    server to confirm the join (squad-data packet -> join_confirmed), spams
+    READY + match start, stays in the match until it ends (MATCH_STAY_DURATION),
+    then leaves and repeats. Without a team code the loop idles in waiting_team
     state (the server ignores solo matchmaking packets entirely)."""
-    global online_writer, whisper_writer, MATCH_LOOP_ENABLED, MATCH_CYCLES, LEVEL_TEAM_CODE, LEVEL_STATE, SQUAD_OWNER
+    global online_writer, whisper_writer, MATCH_LOOP_ENABLED, MATCH_CYCLES, LEVEL_TEAM_CODE, LEVEL_STATE, SQUAD_OWNER, join_confirmed
     while True:
         try:
             if not MATCH_LOOP_ENABLED:
@@ -872,9 +887,24 @@ async def random_match_loop(key, iv, region, bot_uid):
                 await asyncio.sleep(5)
                 continue
             LEVEL_STATE = "joining"
+            join_confirmed = False
             join_packet = await join_teamcode_packet(LEVEL_TEAM_CODE, key, iv, region)
             await SEndPacKeT(whisper_writer, online_writer, 'OnLine', join_packet)
-            await asyncio.sleep(3)
+            join_wait = 0
+            while not join_confirmed:
+                await asyncio.sleep(2)
+                join_wait += 2
+                if online_writer is None:
+                    break
+                if not MATCH_LOOP_ENABLED or not LEVEL_TEAM_CODE:
+                    break
+                if join_wait % 8 == 0:
+                    await SEndPacKeT(whisper_writer, online_writer, 'OnLine', join_packet)
+                if join_wait >= 60:
+                    print(f"⚠️ Level-up loop: join not confirmed after {join_wait}s, re-sending join...")
+                    join_wait = 0
+            if not join_confirmed:
+                continue
             if online_writer is None:
                 continue
             LEVEL_STATE = "readying"
@@ -899,6 +929,8 @@ async def random_match_loop(key, iv, region, bot_uid):
             leave_packet = await leave_squad(key, iv, region)
             if online_writer is not None:
                 await SEndPacKeT(whisper_writer, online_writer, 'OnLine', leave_packet)
+            join_confirmed = False
+            print("🚪 Level-up loop: sent leave, re-joining next cycle")
             await asyncio.sleep(5)
             MATCH_CYCLES += 1
             LEVEL_STATE = f"cycle_{MATCH_CYCLES}_done"
@@ -3020,13 +3052,122 @@ async def send_sticker(target_uid, chat_id, key, iv, nickname="DEVILxBOT"):
 def get_random_evo_emote():
     return int(random.choice([evo_emotes[str(i)] for i in range(1, 19)]))
 
+async def BattleUDP(match_ip, match_port, match_key, match_token, key, iv, region, match_room=0):
+    """UDP connection to the battle server after the host starts a match. The
+    account only counts as "in the match" (and only earns match EXP) while it
+    is connected to the battle server, so we authenticate with the redirect
+    JWT and keep the socket alive until the match ends."""
+    global online_writer, whisper_writer
+    loop = asyncio.get_event_loop()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setblocking(False)
+    match_port = int(match_port)
+    bot_uid = 17114338249
+    print(f"🎮 Battle UDP → {match_ip}:{match_port}")
+
+    async def frame_token(hex_token, enc_key, enc_iv):
+        uid_hex = hex(bot_uid)[2:]
+        headers = {"9": "0000000", "8": "00000000", "10": "000000", "7": "000000000"}.get(str(len(uid_hex)), "0000000")
+        ts = hex(int(time.time()))[2:]
+        enc_ts = await EnC_PacKeT(ts, enc_key, enc_iv)
+        payload = await EnC_PacKeT(hex_token, enc_key, enc_iv)
+        header = f"0115{headers}{uid_hex}{enc_ts}00000{hex(len(payload)//2)[2:]}"
+        if len(header) % 2:
+            header = header[:4] + "0" + header[4:]
+        return bytes.fromhex(header + payload)
+
+    def pb_wrap(token):
+        tb = token.encode()
+        n = len(tb)
+        v = b""
+        while True:
+            b7 = n & 0x7F
+            n >>= 7
+            if n:
+                v += bytes([b7 | 0x80])
+            else:
+                v += bytes([b7])
+                break
+        return b"\x0a" + v + tb
+
+    def kcp(cmd, payload=b"", conv=0):
+        hdr = struct.pack("<IBBHIIII", conv, cmd, 0, 512, 0, 0, 0, len(payload))
+        return hdr + payload
+
+    room_id = match_room if isinstance(match_room, int) else 0
+    variants = [
+        ("raw JWT", match_token.encode("utf-8")),
+        ("4B len + JWT", len(match_token).to_bytes(4, "big") + match_token.encode("utf-8")),
+        ("ch05+4B len+JWT", b"\x05" + len(match_token).to_bytes(4, "big") + match_token.encode("utf-8")),
+        ("frame login key/iv", await frame_token(match_token.encode().hex(), key, iv)),
+        ("frame match_key+login iv", await frame_token(match_token.encode().hex(), bytes.fromhex(match_key), iv)),
+        ("frame match_key+match_key", await frame_token(match_token.encode().hex(), bytes.fromhex(match_key), bytes.fromhex(match_key))),
+        ("enc raw match_key+loginiv", bytes.fromhex(await EnC_PacKeT(match_token.encode().hex(), bytes.fromhex(match_key), iv))),
+        ("enc raw match_key+match_key", bytes.fromhex(await EnC_PacKeT(match_token.encode().hex(), bytes.fromhex(match_key), bytes.fromhex(match_key)))),
+        ("ch05+len+enc match_key+match_key", b"\x05" + (len(match_token) + 16).to_bytes(4, "big") + bytes.fromhex(await EnC_PacKeT(match_token.encode().hex(), bytes.fromhex(match_key), bytes.fromhex(match_key)))),
+        ("pb{1:JWT} raw", pb_wrap(match_token)),
+        ("frame pb{1:JWT} match_key+match_key", await frame_token(pb_wrap(match_token).hex(), bytes.fromhex(match_key), bytes.fromhex(match_key))),
+        ("frame pb{1:JWT} match_key+loginiv", await frame_token(pb_wrap(match_token).hex(), bytes.fromhex(match_key), iv)),
+        ("frame pb{1:JWT} login key/iv", await frame_token(pb_wrap(match_token).hex(), key, iv)),
+        ("enc pb{1:JWT} match_key+match_key", bytes.fromhex(await EnC_PacKeT(pb_wrap(match_token).hex(), bytes.fromhex(match_key), bytes.fromhex(match_key)))),
+        ("KCP ASK", kcp(0x81)),
+        ("KCP ASK conv=room", kcp(0x81, conv=room_id & 0xFFFFFFFF)),
+        ("KCP PUSH JWT", kcp(0x83, match_token.encode())),
+        ("KCP PUSH JWT conv=room", kcp(0x83, match_token.encode(), room_id & 0xFFFFFFFF)),
+        ("KCP PUSH pbJWT", kcp(0x83, pb_wrap(match_token))),
+        ("KCP PUSH pbJWT conv=room", kcp(0x83, pb_wrap(match_token), room_id & 0xFFFFFFFF)),
+        ("KCP PUSH encJWT(mk,mk)", kcp(0x83, bytes.fromhex(await EnC_PacKeT(match_token.encode().hex(), bytes.fromhex(match_key), bytes.fromhex(match_key))))),
+        ("KCP PUSH encJWT conv=room", kcp(0x83, bytes.fromhex(await EnC_PacKeT(match_token.encode().hex(), bytes.fromhex(match_key), bytes.fromhex(match_key))), room_id & 0xFFFFFFFF)),
+    ]
+    for name, pkt in variants:
+        try:
+            await loop.sock_sendto(sock, pkt, (match_ip, match_port))
+            print(f"⚡ Battle auth '{name}' sent ({len(pkt)} bytes)")
+        except Exception as e:
+            print(f"⚠️ send '{name}' failed: {str(e)[:100]}")
+        try:
+            data, addr = await asyncio.wait_for(loop.sock_recvfrom(sock, 9999), timeout=3)
+            print(f"✅✅ BATTLE SERVER REPLIED to '{name}' ({len(data)} bytes): {data.hex()[:200]}")
+            break
+        except asyncio.TimeoutError:
+            print(f"⏳ silent for '{name}'")
+    try:
+        last_beat = time.time()
+        while True:
+            try:
+                data, addr = await asyncio.wait_for(loop.sock_recvfrom(sock, 9999), timeout=6)
+            except asyncio.TimeoutError:
+                if time.time() - last_beat > 5:
+                    print("💓 Battle heartbeat (keepalive)")
+                    try:
+                        await loop.sock_sendto(sock, bytes.fromhex("0500000003"), (match_ip, match_port))
+                    except Exception:
+                        pass
+                    last_beat = time.time()
+                continue
+        print(f"[BATTLE] len={len(data)} {data.hex()[:300]}")
+    except asyncio.CancelledError:
+        print("🎮 Battle connection cancelled")
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"⚠️ Battle server error: {str(e)[:150]}")
+    finally:
+        try:
+            sock.close()
+        except Exception:
+            pass
+    print("🎮 Match over — back to lobby")
+
 async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
-    global online_writer, whisper_writer, spammer_uid, spam_chat_id, spam_uid, XX, uid, Spy, data2, Chat_Leave, fast_spam_running, fast_spam_task, custom_spam_running, custom_spam_task, spam_request_running, spam_request_task, evo_fast_spam_running, evo_fast_spam_task, evo_custom_spam_running, evo_custom_spam_task, lag_running, lag_task, spm_inv_running, spm_inv_task, last_status_packet, status_response_cache, insquad, joining_team, whisper_writer, region, exploit_running, exploit_instance, SQUAD_OWNER
+    global online_writer, whisper_writer, spammer_uid, spam_chat_id, spam_uid, XX, uid, Spy, data2, Chat_Leave, fast_spam_running, fast_spam_task, custom_spam_running, custom_spam_task, spam_request_running, spam_request_task, evo_fast_spam_running, evo_fast_spam_task, evo_custom_spam_running, evo_custom_spam_task, lag_running, lag_task, spm_inv_running, spm_inv_task, last_status_packet, status_response_cache, insquad, joining_team, whisper_writer, region, exploit_running, exploit_instance, SQUAD_OWNER, join_confirmed
     bot_uid = 14572471551
     if insquad is not None:
         insquad = None
     if joining_team is True:
         joining_team = False
+    join_confirmed = False
     online_writer = None
     whisper_writer = None
     available_bundles = {
@@ -3049,11 +3190,33 @@ async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
             bytes_payload = bytes.fromhex(AutHToKen)
             online_writer.write(bytes_payload)
             await online_writer.drain()
+            print(f"🟢 ONLINE socket reconnected to {ip}:{port}")
             while True:
                 data2 = await reader.read(9999)
                 if not data2:
                     break
                 data_hex = data2.hex()
+                if len(data2) > 30:
+                    try:
+                        pkt = await DeCode_PackEt(data_hex[10:])
+                        j = json.loads(pkt)
+                        pkt_type = j.get('4', {}).get('data') if isinstance(j.get('4'), dict) else j.get('4')
+                        s = json.dumps(j)
+                        print(f"[PKT] type={pkt_type} len={len(data2)} {s}")
+                        p5 = j.get('5', {})
+                        if isinstance(p5, dict):
+                            p5d = p5.get('data')
+                            if isinstance(p5d, dict):
+                                f2 = p5d.get('2', {}).get('data')
+                                f4 = p5d.get('4', {}).get('data')
+                                if isinstance(f2, str) and ':' in f2 and isinstance(f4, str) and f4.startswith('eyJ'):
+                                    match_ip, match_port = f2.rsplit(':', 1)
+                                    match_key = p5d.get('3', {}).get('data')
+                                    match_room = p5d.get('1', {}).get('data', 0)
+                                    print(f"🎮 MATCH START DETECTED -> {f2} room={match_room}")
+                                    asyncio.create_task(BattleUDP(match_ip, match_port, match_key, f4, key, iv, region, match_room))
+                    except Exception:
+                        print(f"[PKT] raw len={len(data2)} {data_hex[:60]}...")
                 if data_hex.startswith('0500') and insquad is not None and joining_team == False:
                     try:
                         packet = await DeCode_PackEt(data_hex[10:])
@@ -3061,6 +3224,8 @@ async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
                         if packet_json.get('1') in [6, 7]:
                             insquad = None
                             joining_team = False
+                            join_confirmed = False
+                            print(f"👋 Squad msg {packet_json.get('1')} received — squad state cleared")
                             continue
                     except Exception as e:
                         pass
@@ -3074,18 +3239,29 @@ async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
                         code = packet_json['5']['data']['8']['data']
                         emote_id = 909050008
                         bot_uid = 14572471551
+                        print(f"🎯 INVITE: inviter={invite_uid} bot_uid={uid} code={code}")
                         SendInv = await RedZed_SendInv(bot_uid, invite_uid, key, iv)
                         await SEndPacKeT(whisper_writer, online_writer, 'OnLine', SendInv)
                         inv_packet = await RejectMSGtaxt(squad_owner, uid, key, iv)
                         await SEndPacKeT(whisper_writer, online_writer, 'OnLine', inv_packet)
                         Join = await ArohiAccepted(squad_owner, code, key, iv)
                         await SEndPacKeT(whisper_writer, online_writer, 'OnLine', Join)
+                        print(f"✅ JOIN packet sent (code {code})")
                         await asyncio.sleep(2)
                         emote_to_sender = await Emote_k(int(uid), emote_id, key, iv, region)
                         await SEndPacKeT(whisper_writer, online_writer, 'OnLine', emote_to_sender)
                         bot_emote = await Emote_k(int(bot_uid), emote_id, key, iv, region)
                         await SEndPacKeT(whisper_writer, online_writer, 'OnLine', bot_emote)
                         insquad = True
+                        print(f"✅ insquad=True — in squad with {squad_owner}")
+                        try:
+                            ready_pkt = await ready_squad_packet(int(squad_owner), int(bot_uid), key, iv, region)
+                            for _ in range(3):
+                                await SEndPacKeT(whisper_writer, online_writer, 'OnLine', ready_pkt)
+                                await asyncio.sleep(0.5)
+                            print(f"✅ READY pressed (owner {squad_owner})")
+                        except Exception as ready_error:
+                            print(f"⚠️ READY press failed: {str(ready_error)[:80]}")
                         try:
                             welcome_message = """[B][C][FFFFFF]Welcome to 𝐒ᴛᴀʀ Bot
 
@@ -3127,6 +3303,7 @@ async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
                         packet_json = json.loads(packet)
                         OwNer_UiD, CHaT_CoDe, SQuAD_CoDe = await GeTSQDaTa(packet_json)
                         SQUAD_OWNER = OwNer_UiD
+                        join_confirmed = True
                         JoinCHaT = await AutH_Chat(3, OwNer_UiD, CHaT_CoDe, key, iv)
                         await SEndPacKeT(whisper_writer, online_writer, 'ChaT', JoinCHaT)
                     except Exception as e:
@@ -3137,6 +3314,7 @@ async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
                         packet = json.loads(packet)
                         OwNer_UiD, CHaT_CoDe, SQuAD_CoDe = await GeTSQDaTa(packet)
                         SQUAD_OWNER = OwNer_UiD
+                        join_confirmed = True
                         JoinCHaT = await AutH_Chat(3, OwNer_UiD, CHaT_CoDe, key, iv)
                         await SEndPacKeT(whisper_writer, online_writer, 'ChaT', JoinCHaT)
                         def kx_random_colour(): return "_"
@@ -3191,6 +3369,7 @@ async def TcPOnLine(ip, port, key, iv, AutHToKen, reconnect_delay=0.5):
                                     await online_writer.drain()
                     except Exception as e:
                         continue
+            print("🔌 ONLINE connection dropped — reconnecting...")
             online_writer.close()
             await online_writer.wait_closed()
             online_writer = None
@@ -4156,6 +4335,14 @@ async def TcPChaT(ip, port, AutHToKen, key, iv, LoGinDaTaUncRypTinG, ready_event
 """
                                 await dl_send_message(response.Data.chat_type, initial_msg, uid, chat_id, key, iv)
                                 auto_start_task = asyncio.create_task(auto_start_loop(team_code, uid, chat_id, response.Data.chat_type, key, iv, region))
+                        if inPuTMsG.strip().startswith('/stop_auto'):
+                            stop_auto = True
+                            if auto_start_task and not auto_start_task.done():
+                                auto_start_task.cancel()
+                            auto_start_running = False
+                            auto_start_teamcode = None
+                            success_msg = "[B][C][00FF00]✅ SUCCESS!\n🛑 Auto start bot stopped successfully!\n"
+                            await dl_send_message(response.Data.chat_type, success_msg, uid, chat_id, key, iv)
                         if inPuTMsG.strip().startswith('/random'):
                             parts = inPuTMsG.strip().split()
                             uids = []
